@@ -92,6 +92,11 @@ export const en = {
       hz500: "500 Hz",
       realTime: "Real-time",
     },
+    switchingPollingRate: "Switching polling rate",
+    switchingPollingRateDescription: "Please wait, applying new polling rate settings...",
+    switchingControllerMode: "Switching mode",
+    switchingControllerModeDescription: "Please wait, applying new mode settings...",
+    switchingProgress: "{{progress}}%",
   },
   actions: {
     title: "Actions",

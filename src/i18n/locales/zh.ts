@@ -92,6 +92,11 @@ export const zh = {
       hz500: "500 Hz",
       realTime: "实时",
     },
+    switchingPollingRate: "正在切换回报率",
+    switchingPollingRateDescription: "请稍候，正在应用新的回报率设置...",
+    switchingControllerMode: "正在切换模式",
+    switchingControllerModeDescription: "请稍候，正在应用新的模式设置...",
+    switchingProgress: "{{progress}}%",
   },
   actions: {
     title: "操作",

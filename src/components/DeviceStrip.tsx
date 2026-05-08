@@ -83,6 +83,10 @@ export function DeviceStrip({
         {hasPairedDevice ? (
           pairedDevices.map((item) => {
             const [deviceName, deviceId] = item.label.split(" · ");
+            const isEdge = deviceName.includes("Edge");
+            const controllerImage = isEdge
+              ? { src: "/images/ps5-controller-edge.webp", width: 1240, height: 916 }
+              : { src: "/svg/ps5-controller-gamepad-seeklogo.svg", width: undefined, height: undefined };
             return (
               <Card
                 key={item.key}
@@ -99,7 +103,7 @@ export function DeviceStrip({
                 <CardContent className="device-strip">
                   <div className="device-preview" aria-hidden="true">
                     <div className="device-hero connected-device-hero">
-                      <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" aria-hidden="true" draggable={false} />
+                      <img src={controllerImage.src} alt="" aria-hidden="true" draggable={false} width={controllerImage.width} height={controllerImage.height} />
                     </div>
                   </div>
                   <div className="device-info-panel">

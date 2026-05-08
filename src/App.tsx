@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useCallback, type CSSProperties } from "react";
 import { Info, Settings } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -29,21 +29,19 @@ export default function App() {
   const { t } = useTranslation();
   const [view, setView] = useState<AppView>("home");
   const isBusy = bridge.operation !== null;
+  // 进度条完成后切换回主页（仅在模式切换场景下触发）
+  const handleProgressComplete = useCallback(() => {
+    if (bridge.shouldReturnHomeRef.current) {
+      setView("home");
+      bridge.clearReturnHome();
+    }
+  }, [bridge.clearReturnHome, bridge.shouldReturnHomeRef]);
 
   useEffect(() => {
-    if (!bridge.client && view === "settings") {
+    if (!bridge.client && view === "settings" && !bridge.shouldReturnHomeRef.current) {
       setView("home");
     }
-  }, [bridge.client, view]);
-
-  useEffect(() => {
-    if (!bridge.shouldReturnHome) {
-      return;
-    }
-
-    setView("home");
-    bridge.clearReturnHome();
-  }, [bridge]);
+  }, [bridge.client, bridge.shouldReturnHome, view]);
 
   useEffect(() => {
     if (!bridge.error) {
@@ -136,7 +134,7 @@ export default function App() {
             </Sidebar>
 
             <SidebarInset className="settings-detail">
-              <ConfigPanel bridge={bridge} />
+              <ConfigPanel bridge={bridge} onProgressComplete={handleProgressComplete} />
             </SidebarInset>
           </SidebarProvider>
         )}

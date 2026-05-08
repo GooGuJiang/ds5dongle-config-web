@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ConfigBody,
@@ -36,6 +36,7 @@ export interface UseDs5BridgeResult {
   error: string | null;
   statusText: string;
   shouldReturnHome: boolean;
+  shouldReturnHomeRef: RefObject<boolean>;
   isConnected: boolean;
   isDirty: boolean;
   isDefaultConfig: boolean;
@@ -64,6 +65,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const [error, setError] = useState<string | null>(null);
   const [needsUsbReconnect, setNeedsUsbReconnect] = useState(false);
   const [shouldReturnHome, setShouldReturnHome] = useState(false);
+  const shouldReturnHomeRef = useRef(false);
   const [batteryText, setBatteryText] = useState("--");
   const [authorizedDeviceBatteryText, setAuthorizedDeviceBatteryText] = useState<Record<string, string>>({});
   const [settledStatusText, setSettledStatusText] = useState(t("status.ready"));
@@ -260,26 +262,28 @@ export function useDs5Bridge(): UseDs5BridgeResult {
         setConfig(nextDraft);
         const currentUsbEffectiveConfig = usbEffectiveConfigRef.current;
         const pollingRateChanged = currentUsbEffectiveConfig?.pollingRateMode !== nextDraft.pollingRateMode;
-        const needsReconnect = usbEffectiveConfigChanged(currentUsbEffectiveConfig, nextDraft);
+        const controllerModeChanged = currentUsbEffectiveConfig?.controllerMode !== nextDraft.controllerMode;
+        const needsReconnect = pollingRateChanged || controllerModeChanged;
         setSaveState("applied");
         setError(null);
 
-        if (pollingRateChanged) {
+        if (needsReconnect) {
           expectedUsbDisconnectRef.current = true;
           requireManualSelectionRef.current = true;
+          // 先设置 shouldReturnHome（ref 同步 + state 异步），防止 disconnect 事件中
+          // clearConnectedDevice 将 client 设为 null 后 App.tsx 的 useEffect 提前切换到主页
+          shouldReturnHomeRef.current = true;
           setShouldReturnHome(true);
           try {
             await nextClient.reconnectUsb();
           } catch {
             // The device can close immediately after the reconnect command is sent.
-            // This is expected for polling-rate changes, so keep the UI quiet and
+            // This is expected for polling-rate or controller-mode changes, so keep the UI quiet and
             // require the user to select the device again manually.
           }
           clearConnectedDevice();
           setAuthorizedDevices([]);
           break;
-        } else if (needsReconnect) {
-          setNeedsUsbReconnect(true);
         } else {
           setNeedsUsbReconnect(false);
         }
@@ -501,6 +505,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     error,
     statusText: settledStatusText,
     shouldReturnHome,
+    shouldReturnHomeRef,
     isConnected,
     isDirty,
     isDefaultConfig,
@@ -513,7 +518,10 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     saveToFlash,
     reconnectUsb,
     resetToDefaults,
-    clearReturnHome: () => setShouldReturnHome(false),
+    clearReturnHome: () => {
+      shouldReturnHomeRef.current = false;
+      setShouldReturnHome(false);
+    },
     clearError: () => setError(null),
   };
 }
