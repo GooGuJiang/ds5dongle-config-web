@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
+const appVersion = "0.1.1";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -12,8 +14,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["pwa-icon.svg", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
-        name: "DS5 Bridge Config",
-        short_name: "DS5 Config",
+        name: "DS5 Dongle Web",
+        short_name: "DS5 Web",
         description: "DS5 Bridge HID device configuration tool with offline access.",
         theme_color: "#111827",
         background_color: "#f5f7fa",
@@ -49,6 +51,7 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        cacheId: `ds5dongle-config-web-${appVersion}`,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
         navigateFallback: "index.html",
       },
