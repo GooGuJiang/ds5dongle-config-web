@@ -99,7 +99,7 @@ export function DeviceStrip({
                 <CardContent className="device-strip">
                   <div className="device-preview" aria-hidden="true">
                     <div className="device-hero connected-device-hero">
-                      <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" aria-hidden="true" />
+                      <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" aria-hidden="true" draggable={false} />
                     </div>
                   </div>
                   <div className="device-info-panel">

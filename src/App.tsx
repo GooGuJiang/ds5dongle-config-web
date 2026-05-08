@@ -111,7 +111,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          <SidebarProvider className="settings-page" style={{ "--sidebar-width": "216px" } as CSSProperties}>
+          <SidebarProvider className="settings-page" style={{ "--sidebar-width": "248px" } as CSSProperties}>
             <Sidebar className="settings-sidebar" collapsible="icon" aria-label={t("settings.navigation")}>
               <SidebarContent className="settings-sidebar-content">
                 <SidebarGroup>
