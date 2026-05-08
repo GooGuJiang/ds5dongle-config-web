@@ -1,18 +1,49 @@
-import { useEffect } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { Info, Settings } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import { ActionsPanel } from "./components/ActionsPanel";
-import { AppFooter } from "./components/AppFooter";
+import { useTranslation } from "react-i18next";
 import { AppHeader } from "./components/AppHeader";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
 import { NoticeList } from "./components/NoticeList";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "./components/ui/sidebar";
 import { useDs5Bridge } from "./hooks/useDs5Bridge";
 import { useTheme } from "./hooks/useTheme";
+
+type AppView = "home" | "settings";
 
 export default function App() {
   const bridge = useDs5Bridge();
   const theme = useTheme();
+  const { t } = useTranslation();
+  const [view, setView] = useState<AppView>("home");
   const isBusy = bridge.operation !== null;
+
+  useEffect(() => {
+    if (!bridge.client && view === "settings") {
+      setView("home");
+    }
+  }, [bridge.client, view]);
+
+  useEffect(() => {
+    if (!bridge.shouldReturnHome) {
+      return;
+    }
+
+    setView("home");
+    bridge.clearReturnHome();
+  }, [bridge]);
 
   useEffect(() => {
     if (!bridge.error) {
@@ -45,30 +76,71 @@ export default function App() {
           },
         }}
       />
-      <main className="app-shell">
+      <main className={`app-shell ${view === "settings" ? "settings-mode" : ""}`}>
         <AppHeader
-          isConnected={bridge.isConnected}
-          statusText={bridge.statusText}
           theme={theme.theme}
           onThemeChange={theme.setTheme}
-        />
-        <NoticeList supported={bridge.supported} />
-        <DeviceStrip
-          authorizedDevices={bridge.authorizedDevices}
-          client={bridge.client}
-          deviceLabel={bridge.deviceLabel}
+          statusText={view === "settings" && bridge.client ? bridge.statusText : undefined}
+          issues={bridge.issues.map((issue) => t(`validation.${issue.field}`))}
+          needsUsbReconnect={bridge.needsUsbReconnect}
+          showBackButton={view === "settings"}
+          onBack={() => setView("home")}
+          showDeviceActions={view === "settings" && Boolean(bridge.client)}
+          canUseDeviceActions={Boolean(bridge.client)}
+          canResetToDefaults={!bridge.isDefaultConfig}
           isBusy={isBusy}
-          supported={bridge.supported}
-          onConnect={bridge.connect}
-          onConnectAuthorized={bridge.connectAuthorized}
+          onReadConfig={bridge.readConfig}
+          onResetToDefaults={bridge.resetToDefaults}
         />
+        {view === "home" ? (
+          <>
+            <NoticeList supported={bridge.supported} />
+            <div className="device-stage-wrap">
+              <DeviceStrip
+                authorizedDevices={bridge.authorizedDevices}
+                authorizedDeviceBatteryText={bridge.authorizedDeviceBatteryText}
+                client={bridge.client}
+                batteryText={bridge.batteryText}
+                deviceLabel={bridge.deviceLabel}
+                isBusy={isBusy}
+                supported={bridge.supported}
+                onConnect={bridge.connect}
+                onConnectAuthorized={bridge.connectAuthorized}
+                onOpenSettings={() => setView("settings")}
+              />
+            </div>
+          </>
+        ) : (
+          <SidebarProvider className="settings-page" style={{ "--sidebar-width": "216px" } as CSSProperties}>
+            <Sidebar className="settings-sidebar" collapsible="icon" aria-label={t("settings.navigation")}>
+              <SidebarContent className="settings-sidebar-content">
+                <SidebarGroup>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {[
+                        { icon: Settings, label: t("settings.nav.settings"), active: true },
+                        { icon: Info, label: t("settings.nav.about") },
+                      ].map((item) => (
+                        <SidebarMenuItem key={item.label}>
+                          <SidebarMenuButton type="button" isActive={item.active} tooltip={item.label}>
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </SidebarContent>
+              <SidebarTrigger className="settings-sidebar-trigger" />
+            </Sidebar>
 
-        <div className="content-grid">
-          <ConfigPanel bridge={bridge} />
-          <ActionsPanel bridge={bridge} isBusy={isBusy} />
-        </div>
+            <SidebarInset className="settings-detail">
+              <ConfigPanel bridge={bridge} />
+            </SidebarInset>
+          </SidebarProvider>
+        )}
 
-        <AppFooter />
       </main>
     </>
   );

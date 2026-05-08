@@ -25,6 +25,8 @@ export interface UseDs5BridgeResult {
   supported: boolean;
   client: Ds5BridgeHidClient | null;
   deviceLabel: string;
+  batteryText: string;
+  authorizedDeviceBatteryText: Record<string, string>;
   authorizedDevices: HIDDevice[];
   config: ConfigBody | null;
   draft: ConfigBody;
@@ -33,6 +35,7 @@ export interface UseDs5BridgeResult {
   operation: Operation;
   error: string | null;
   statusText: string;
+  shouldReturnHome: boolean;
   isConnected: boolean;
   isDirty: boolean;
   isDefaultConfig: boolean;
@@ -45,6 +48,7 @@ export interface UseDs5BridgeResult {
   saveToFlash: () => Promise<void>;
   reconnectUsb: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
+  clearReturnHome: () => void;
   clearError: () => void;
 }
 
@@ -59,12 +63,18 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [needsUsbReconnect, setNeedsUsbReconnect] = useState(false);
+  const [shouldReturnHome, setShouldReturnHome] = useState(false);
+  const [batteryText, setBatteryText] = useState("--");
+  const [authorizedDeviceBatteryText, setAuthorizedDeviceBatteryText] = useState<Record<string, string>>({});
   const clientRef = useRef<Ds5BridgeHidClient | null>(null);
   const configRef = useRef<ConfigBody | null>(null);
   const draftRef = useRef<ConfigBody>(DEFAULT_CONFIG);
   const usbEffectiveConfigRef = useRef<UsbEffectiveConfig | null>(null);
   const applyingRef = useRef(false);
   const applyQueuedRef = useRef(false);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const expectedUsbDisconnectRef = useRef(false);
+  const requireManualSelectionRef = useRef(false);
 
   const issues = useMemo(() => validateConfig(draft), [draft]);
   const isConnected = Boolean(client?.device.opened);
@@ -100,8 +110,35 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       return;
     }
 
+    if (requireManualSelectionRef.current) {
+      setAuthorizedDevices([]);
+      return;
+    }
+
     setAuthorizedDevices(await Ds5BridgeHidClient.authorizedDevices());
   }, [supported]);
+
+  const scanAuthorizedDeviceBattery = useCallback(async (devices: HIDDevice[]) => {
+    const entries = await Promise.all(
+      devices.map(async (device) => {
+        if (clientRef.current?.device === device) {
+          return [deviceKey(device), batteryText] as const;
+        }
+
+        const nextClient = new Ds5BridgeHidClient(device);
+        try {
+          await nextClient.open();
+          const nextBatteryText = await listenForBatteryText(device, 900);
+          await nextClient.close();
+          return [deviceKey(device), nextBatteryText ?? "--"] as const;
+        } catch {
+          return [deviceKey(device), "--"] as const;
+        }
+      }),
+    );
+
+    setAuthorizedDeviceBatteryText(Object.fromEntries(entries));
+  }, [batteryText]);
 
   const readConfigWithClient = useCallback(async (nextClient: Ds5BridgeHidClient, syncUsbEffectiveConfig = false) => {
     setOperation("reading");
@@ -122,6 +159,19 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     }
   }, []);
 
+  const clearConnectedDevice = useCallback(() => {
+    clientRef.current = null;
+    configRef.current = null;
+    draftRef.current = DEFAULT_CONFIG;
+    usbEffectiveConfigRef.current = null;
+    setClient(null);
+    setConfig(null);
+    setDraft(DEFAULT_CONFIG);
+    setNeedsUsbReconnect(false);
+    setSaveState("idle");
+    setBatteryText("--");
+  }, []);
+
   const attachClient = useCallback(
     async (nextClient: Ds5BridgeHidClient) => {
       setOperation("connecting");
@@ -140,9 +190,15 @@ export function useDs5Bridge(): UseDs5BridgeResult {
 
   const connect = useCallback(async () => {
     try {
+      requireManualSelectionRef.current = false;
       await attachClient(await Ds5BridgeHidClient.requestDevice());
       await refreshAuthorizedDevices();
     } catch (cause) {
+      if (isNoDeviceSelectedError(cause)) {
+        setOperation(null);
+        return;
+      }
+
       setError(errorMessage(cause, t));
       setOperation(null);
     }
@@ -198,9 +254,31 @@ export function useDs5Bridge(): UseDs5BridgeResult {
         await nextClient.applyConfig(nextDraft);
         configRef.current = nextDraft;
         setConfig(nextDraft);
-        setNeedsUsbReconnect(usbEffectiveConfigChanged(usbEffectiveConfigRef.current, nextDraft));
+        const currentUsbEffectiveConfig = usbEffectiveConfigRef.current;
+        const pollingRateChanged = currentUsbEffectiveConfig?.pollingRateMode !== nextDraft.pollingRateMode;
+        const needsReconnect = usbEffectiveConfigChanged(currentUsbEffectiveConfig, nextDraft);
         setSaveState("applied");
         setError(null);
+
+        if (pollingRateChanged) {
+          expectedUsbDisconnectRef.current = true;
+          requireManualSelectionRef.current = true;
+          setShouldReturnHome(true);
+          try {
+            await nextClient.reconnectUsb();
+          } catch {
+            // The device can close immediately after the reconnect command is sent.
+            // This is expected for polling-rate changes, so keep the UI quiet and
+            // require the user to select the device again manually.
+          }
+          clearConnectedDevice();
+          setAuthorizedDevices([]);
+          break;
+        } else if (needsReconnect) {
+          setNeedsUsbReconnect(true);
+        } else {
+          setNeedsUsbReconnect(false);
+        }
 
         if (configsEqual(draftRef.current, nextDraft)) {
           draftRef.current = nextDraft;
@@ -220,16 +298,17 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     }
 
     return true;
-  }, [t]);
+  }, [clearConnectedDevice, t]);
 
   const saveToFlash = useCallback(async () => {
-    if (!client || isDirty) {
+    const nextClient = clientRef.current;
+    if (!nextClient || !configsEqual(configRef.current, draftRef.current)) {
       return;
     }
 
     setOperation("saving");
     try {
-      await client.saveToFlash();
+      await nextClient.saveToFlash();
       setSaveState("saved");
       setError(null);
     } catch (cause) {
@@ -237,7 +316,21 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     } finally {
       setOperation(null);
     }
-  }, [client, isDirty, t]);
+  }, [t]);
+
+  const scheduleAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = window.setTimeout(async () => {
+      autoSaveTimerRef.current = null;
+      const applied = await applyLatestDraft();
+      if (applied && configsEqual(configRef.current, draftRef.current)) {
+        await saveToFlash();
+      }
+    }, 500);
+  }, [applyLatestDraft, saveToFlash]);
 
   const reconnectUsb = useCallback(async () => {
     if (!client) {
@@ -263,9 +356,9 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       draftRef.current = nextDraft;
       setDraft(nextDraft);
       setSaveState("dirty");
-      void applyLatestDraft();
+      scheduleAutoSave();
     },
-    [applyLatestDraft],
+    [scheduleAutoSave],
   );
 
   const resetToDefaults = useCallback(async () => {
@@ -300,22 +393,36 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   }, [refreshAuthorizedDevices]);
 
   useEffect(() => {
+    if (authorizedDevices.length === 0) {
+      setAuthorizedDeviceBatteryText({});
+      return;
+    }
+
+    void scanAuthorizedDeviceBattery(authorizedDevices);
+  }, [authorizedDevices, scanAuthorizedDeviceBattery]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!navigator.hid) {
       return;
     }
 
     const handleDisconnect = (event: HIDConnectionEvent) => {
       if (client?.device === event.device) {
-        clientRef.current = null;
-        configRef.current = null;
-        draftRef.current = DEFAULT_CONFIG;
-        usbEffectiveConfigRef.current = null;
-        setClient(null);
-        setConfig(null);
-        setDraft(DEFAULT_CONFIG);
-        setNeedsUsbReconnect(false);
-        setSaveState("idle");
-        setError(t("errors.disconnected"));
+        clearConnectedDevice();
+        if (expectedUsbDisconnectRef.current) {
+          expectedUsbDisconnectRef.current = false;
+          setError(null);
+        } else {
+          setError(t("errors.disconnected"));
+        }
       }
       void refreshAuthorizedDevices();
     };
@@ -331,12 +438,39 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       navigator.hid?.removeEventListener("disconnect", handleDisconnect);
       navigator.hid?.removeEventListener("connect", handleConnect);
     };
-  }, [client, refreshAuthorizedDevices, t]);
+  }, [clearConnectedDevice, client, refreshAuthorizedDevices, t]);
+
+  useEffect(() => {
+    const device = client?.device;
+    if (!device) {
+      setBatteryText("--");
+      return;
+    }
+
+    const handleInputReport = (event: HIDInputReportEvent) => {
+      if (event.device !== device) {
+        return;
+      }
+
+      const nextBatteryText = parseDualSenseBatteryText(event.data, event.reportId);
+      if (nextBatteryText) {
+        setBatteryText(nextBatteryText);
+      }
+    };
+
+    device.addEventListener("inputreport", handleInputReport);
+
+    return () => {
+      device.removeEventListener("inputreport", handleInputReport);
+    };
+  }, [client]);
 
   return {
     supported,
     client,
     deviceLabel,
+    batteryText,
+    authorizedDeviceBatteryText,
     authorizedDevices,
     config,
     draft,
@@ -345,6 +479,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     operation,
     error,
     statusText,
+    shouldReturnHome,
     isConnected,
     isDirty,
     isDefaultConfig,
@@ -357,8 +492,64 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     saveToFlash,
     reconnectUsb,
     resetToDefaults,
+    clearReturnHome: () => setShouldReturnHome(false),
     clearError: () => setError(null),
   };
+}
+
+function deviceKey(device: HIDDevice): string {
+  return `${device.vendorId}:${device.productId}:${device.productName}`;
+}
+
+function listenForBatteryText(device: HIDDevice, timeoutMs: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      device.removeEventListener("inputreport", handleInputReport);
+      resolve(null);
+    }, timeoutMs);
+
+    const handleInputReport = (event: HIDInputReportEvent) => {
+      if (event.device !== device) {
+        return;
+      }
+
+      const nextBatteryText = parseDualSenseBatteryText(event.data, event.reportId);
+      if (!nextBatteryText) {
+        return;
+      }
+
+      window.clearTimeout(timeout);
+      device.removeEventListener("inputreport", handleInputReport);
+      resolve(nextBatteryText);
+    };
+
+    device.addEventListener("inputreport", handleInputReport);
+  });
+}
+
+function parseDualSenseBatteryText(data: DataView, reportId: number): string | null {
+  const status0Offset = reportId === 0x31 ? 53 : 52;
+  if (data.byteLength <= status0Offset) {
+    return null;
+  }
+
+  const status0 = data.getUint8(status0Offset);
+  const chargeStatus = (status0 & 0xf0) >> 4;
+  let level = status0 & 0x0f;
+
+  if (chargeStatus === 2) {
+    level = 10;
+  }
+
+  if (level >= 10) {
+    return "100%";
+  }
+
+  if (level >= 0) {
+    return `${Math.min(level * 10 + 5, 100)}%`;
+  }
+
+  return null;
 }
 
 function operationLabel(operation: Exclude<Operation, null>, t: (key: string) => string): string {
@@ -416,4 +607,8 @@ function errorMessage(cause: unknown, t: (key: string, values?: Record<string, u
   }
 
   return t("errors.unexpectedWebHid");
+}
+
+function isNoDeviceSelectedError(cause: unknown): boolean {
+  return cause instanceof Error && cause.message === NO_DEVICE_SELECTED_ERROR;
 }
