@@ -1,6 +1,7 @@
 import { Gauge, Gamepad2, SlidersHorizontal, Volume2, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { animate } from "motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UseDs5BridgeResult } from "../hooks/useDs5Bridge";
 import { fieldIssue, ControllerMode, PollingRateMode } from "../protocol/config";
@@ -26,102 +27,171 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   const [progressTitle, setProgressTitle] = useState("");
   const [progressDescription, setProgressDescription] = useState("");
   const [progress, setProgress] = useState(0);
-  const progressIntervalRef = useRef<number | null>(null);
-  const prevOperationRef = useRef<string | null>(null);
+
+  const progressValueRef = useRef(0);
+  const progressAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const timeoutIdsRef = useRef<number[]>([]);
+  const prevOperationRef = useRef(bridge.operation);
+  const switchRunIdRef = useRef(0);
+  const finishingRef = useRef(false);
   const onProgressCompleteRef = useRef(onProgressComplete);
+
   onProgressCompleteRef.current = onProgressComplete;
 
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current !== null) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
+  const setProgressValue = useCallback((value: number) => {
+    const nextValue = Math.max(0, Math.min(100, value));
+    progressValueRef.current = nextValue;
+    setProgress(nextValue);
   }, []);
 
-  // 监听操作状态，当操作从非null变为null时（操作真正完成）关闭对话框
+  const clearManagedTimeouts = useCallback(() => {
+    timeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
+    timeoutIdsRef.current = [];
+  }, []);
+
+  const delay = useCallback((ms: number) => {
+    return new Promise<void>((resolve) => {
+      const id = window.setTimeout(() => {
+        timeoutIdsRef.current = timeoutIdsRef.current.filter(
+          (timeoutId) => timeoutId !== id,
+        );
+        resolve();
+      }, ms);
+
+      timeoutIdsRef.current.push(id);
+    });
+  }, []);
+
+  const stopProgressAnimation = useCallback(() => {
+    progressAnimationRef.current?.stop();
+    progressAnimationRef.current = null;
+  }, []);
+
+  const animateProgressTo = useCallback(
+    (to: number, durationMs: number, runId: number) => {
+      stopProgressAnimation();
+
+      const controls = animate(progressValueRef.current, to, {
+        duration: durationMs / 1000,
+        ease: "linear",
+        onUpdate: (latest) => {
+          // 防止第二次触发时，第一次动画的异步回调污染当前进度
+          if (switchRunIdRef.current !== runId) {
+            return;
+          }
+
+          setProgressValue(latest);
+        },
+      });
+
+      progressAnimationRef.current = controls;
+      return controls;
+    },
+    [setProgressValue, stopProgressAnimation],
+  );
+
+  const startProgressAnimation = useCallback(
+    (title: string, description: string) => {
+      const runId = switchRunIdRef.current + 1;
+      switchRunIdRef.current = runId;
+      finishingRef.current = false;
+
+      clearManagedTimeouts();
+      stopProgressAnimation();
+
+      setProgressTitle(title);
+      setProgressDescription(description);
+      setProgressValue(0);
+      setShowProgressDialog(true);
+
+      // 操作执行期间最多走到 90%，等待真正完成后再补到 100%
+      animateProgressTo(90, PROGRESS_ANIMATION_DURATION_MS, runId);
+    },
+    [
+      animateProgressTo,
+      clearManagedTimeouts,
+      setProgressValue,
+      stopProgressAnimation,
+    ],
+  );
+
+  const finishProgressAndReturnHome = useCallback(
+    async (runId: number) => {
+      if (finishingRef.current || switchRunIdRef.current !== runId) {
+        return;
+      }
+
+      finishingRef.current = true;
+
+      const remainingProgress = 100 - progressValueRef.current;
+      const finishDurationMs = Math.max(300, remainingProgress * 10);
+
+      const controls = animateProgressTo(100, finishDurationMs, runId);
+      await controls;
+
+      if (switchRunIdRef.current !== runId) {
+        return;
+      }
+
+      progressAnimationRef.current = null;
+      setProgressValue(100);
+
+      // 让用户看到 100%
+      await delay(800);
+
+      if (switchRunIdRef.current !== runId) {
+        return;
+      }
+
+      setShowProgressDialog(false);
+
+      // 等待 Dialog 关闭动画结束
+      await delay(250);
+
+      if (switchRunIdRef.current !== runId) {
+        return;
+      }
+
+      setProgressValue(0);
+      finishingRef.current = false;
+
+      // 只有这里允许通知 App 返回主页
+      onProgressCompleteRef.current?.();
+    },
+    [animateProgressTo, delay, setProgressValue],
+  );
+
   useEffect(() => {
     const prevOperation = prevOperationRef.current;
     prevOperationRef.current = bridge.operation;
 
-    if (bridge.operation === null && showProgressDialog && prevOperation !== null) {
-      // 操作完成，平滑地将进度条从当前值增加到100%
-      if (progressIntervalRef.current !== null) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      
-      // 获取当前进度值
-      setProgress((currentProgress) => {
-        // 计算从当前进度到100%需要的时间（让动画更平滑）
-        const remainingProgress = 100 - currentProgress;
-        const animationDuration = Math.max(300, remainingProgress * 10); // 至少300ms，根据剩余进度调整
-        const steps = Math.max(10, Math.floor(remainingProgress / 2)); // 至少10步
-        const stepSize = remainingProgress / steps;
-        const stepInterval = animationDuration / steps;
-        
-        let step = 0;
-        progressIntervalRef.current = window.setInterval(() => {
-          step++;
-          if (step >= steps) {
-            if (progressIntervalRef.current !== null) {
-              clearInterval(progressIntervalRef.current);
-              progressIntervalRef.current = null;
-            }
-            setProgress(100);
-            // 等待一段时间后关闭对话框，让用户看到完成状态
-            setTimeout(() => {
-              setShowProgressDialog(false);
-              setProgress(0);
-              // 等待 dialog 关闭动画完成（duration-200）后再回调
-              setTimeout(() => {
-                onProgressCompleteRef.current?.();
-              }, 250);
-            }, 800);
-          } else {
-            setProgress((prev) => Math.min(100, prev + stepSize));
-          }
-        }, stepInterval);
-        
-        return currentProgress; // 保持当前值，由定时器更新
-      });
+    if (
+      showProgressDialog &&
+      bridge.operation === null &&
+      prevOperation !== null
+    ) {
+      void finishProgressAndReturnHome(switchRunIdRef.current);
     }
-  }, [bridge.operation, showProgressDialog]);
+  }, [bridge.operation, finishProgressAndReturnHome, showProgressDialog]);
 
-  // 启动进度条动画
-  const startProgressAnimation = () => {
-    if (progressIntervalRef.current !== null) {
-      clearInterval(progressIntervalRef.current);
-    }
-    // 每50ms更新一次，总时长由 PROGRESS_ANIMATION_DURATION_MS 控制
-    const totalSteps = PROGRESS_ANIMATION_DURATION_MS / 50;
-    const stepIncrement = 90 / totalSteps;
-    progressIntervalRef.current = window.setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          if (progressIntervalRef.current !== null) {
-            clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-          }
-          return 90;
-        }
-        return prev + stepIncrement;
-      });
-    }, 50);
-  };
+  useEffect(() => {
+    return () => {
+      switchRunIdRef.current += 1;
+      clearManagedTimeouts();
+      stopProgressAnimation();
+    };
+  }, [clearManagedTimeouts, stopProgressAnimation]);
 
   // 处理回报率切换
   const handlePollingRateChange = (value: PollingRateMode) => {
     const isChanged = bridge.draft.pollingRateMode !== value;
     bridge.setDraftField("pollingRateMode", value);
-    
+
     if (isChanged && bridge.isConnected) {
-      setShowProgressDialog(true);
-      setProgress(0);
-      setProgressTitle(t("config.switchingPollingRate"));
-      setProgressDescription(t("config.switchingPollingRateDescription"));
-      startProgressAnimation();
+      startProgressAnimation(
+        t("config.switchingPollingRate"),
+        t("config.switchingPollingRateDescription"),
+      );
     }
   };
 
@@ -129,13 +199,12 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   const handleControllerModeChange = (value: ControllerMode) => {
     const isChanged = bridge.draft.controllerMode !== value;
     bridge.setDraftField("controllerMode", value);
-    
+
     if (isChanged && bridge.isConnected) {
-      setShowProgressDialog(true);
-      setProgress(0);
-      setProgressTitle(t("config.switchingControllerMode"));
-      setProgressDescription(t("config.switchingControllerModeDescription"));
-      startProgressAnimation();
+      startProgressAnimation(
+        t("config.switchingControllerMode"),
+        t("config.switchingControllerModeDescription"),
+      );
     }
   };
 
