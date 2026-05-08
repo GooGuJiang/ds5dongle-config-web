@@ -33,6 +33,7 @@ export const en = {
   pwa: {
     offlineReady: "This page has been saved locally and can be opened offline.",
     cacheRefresh: "A new version is available. Updating the page content.",
+    updateFailed: "Failed to update. Please refresh the page manually.",
   },
   footer: {
     title: "Pico2W DualSense 5 Bridge",

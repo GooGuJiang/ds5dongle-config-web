@@ -4,14 +4,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
-const appVersion = "0.1.6";
+const appVersion = "0.1.7";
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       includeAssets: ["pwa-icon.svg", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
         name: "DS5 Dongle Web",

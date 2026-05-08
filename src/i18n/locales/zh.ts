@@ -33,6 +33,7 @@ export const zh = {
   pwa: {
     offlineReady: "页面已保存到本机，离线也可以打开",
     cacheRefresh: "发现新版本，正在更新页面内容",
+    updateFailed: "更新失败，请手动刷新页面",
   },
   footer: {
     title: "Pico2W DualSense 5 Bridge",
