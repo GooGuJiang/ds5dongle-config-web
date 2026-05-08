@@ -1,4 +1,4 @@
-import { ChangeEvent } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -42,18 +42,52 @@ export function FloatControl({
   const { t } = useTranslation();
   const toDisplay = valueToDisplay ?? ((next: number) => (next + displayOffset) * displayScale);
   const toValue = displayToValue ?? ((next: number) => next / displayScale - displayOffset);
-  const inputValue = toDisplay(value);
+  const [localValue, setLocalValue] = useState(toDisplay(value));
+  const [inputText, setInputText] = useState(toDisplay(value).toFixed(fractionDigits));
+  const debounceTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const nextDisplay = toDisplay(value);
+    setLocalValue(nextDisplay);
+    setInputText(nextDisplay.toFixed(fractionDigits));
+  }, [fractionDigits, toDisplay, value]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const commitChange = (next: number, immediate = false) => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const commit = () => onChange(toValue(next));
+    if (immediate) {
+      commit();
+      return;
+    }
+
+    debounceTimerRef.current = window.setTimeout(commit, 120);
+  };
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const next = Number(event.currentTarget.value);
+    setInputText(event.currentTarget.value);
     if (Number.isFinite(next)) {
-      onChange(toValue(next));
+      setLocalValue(next);
+      commitChange(next, true);
     }
   };
 
   const handleSliderChange = ([next]: number[]) => {
     if (Number.isFinite(next)) {
-      onChange(toValue(next));
+      setLocalValue(next);
+      commitChange(next);
     }
   };
 
@@ -68,15 +102,16 @@ export function FloatControl({
           min={displayMin ?? toDisplay(min)}
           max={displayMax ?? toDisplay(max)}
           step={displayStep ?? step * displayScale}
-          value={[inputValue]}
+          value={[localValue]}
           onValueChange={handleSliderChange}
+          onValueCommit={([next]) => Number.isFinite(next) && commitChange(next)}
         />
         <Input
           type="number"
           min={displayMin ?? toDisplay(min)}
           max={displayMax ?? toDisplay(max)}
           step={displayStep ?? step * displayScale}
-          value={inputValue.toFixed(fractionDigits)}
+          value={inputText}
           onChange={handleChange}
           aria-invalid={Boolean(issue)}
           className="font-bold"

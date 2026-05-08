@@ -66,6 +66,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const [shouldReturnHome, setShouldReturnHome] = useState(false);
   const [batteryText, setBatteryText] = useState("--");
   const [authorizedDeviceBatteryText, setAuthorizedDeviceBatteryText] = useState<Record<string, string>>({});
+  const [settledStatusText, setSettledStatusText] = useState(t("status.ready"));
   const clientRef = useRef<Ds5BridgeHidClient | null>(null);
   const configRef = useRef<ConfigBody | null>(null);
   const draftRef = useRef<ConfigBody>(DEFAULT_CONFIG);
@@ -73,6 +74,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const applyingRef = useRef(false);
   const applyQueuedRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
+  const savedStatusTimerRef = useRef<number | null>(null);
   const expectedUsbDisconnectRef = useRef(false);
   const requireManualSelectionRef = useRef(false);
 
@@ -92,9 +94,6 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     if (!client) {
       return t("status.ready");
     }
-    if (isDirty) {
-      return t("status.unsaved");
-    }
     if (saveState === "applied") {
       return t("status.applied");
     }
@@ -102,7 +101,12 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       return t("status.saved");
     }
     return t("status.connected");
-  }, [client, isDirty, operation, saveState, supported, t]);
+  }, [client, operation, saveState, supported, t]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledStatusText(statusText), 120);
+    return () => window.clearTimeout(timer);
+  }, [statusText]);
 
   const refreshAuthorizedDevices = useCallback(async () => {
     if (!supported) {
@@ -310,6 +314,13 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     try {
       await nextClient.saveToFlash();
       setSaveState("saved");
+      if (savedStatusTimerRef.current !== null) {
+        window.clearTimeout(savedStatusTimerRef.current);
+      }
+      savedStatusTimerRef.current = window.setTimeout(() => {
+        setSaveState("idle");
+        savedStatusTimerRef.current = null;
+      }, 900);
       setError(null);
     } catch (cause) {
       setError(errorMessage(cause, t));
@@ -329,7 +340,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       if (applied && configsEqual(configRef.current, draftRef.current)) {
         await saveToFlash();
       }
-    }, 500);
+    }, 180);
   }, [applyLatestDraft, saveToFlash]);
 
   const reconnectUsb = useCallback(async () => {
@@ -380,6 +391,13 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     try {
       await nextClient.saveToFlash();
       setSaveState("saved");
+      if (savedStatusTimerRef.current !== null) {
+        window.clearTimeout(savedStatusTimerRef.current);
+      }
+      savedStatusTimerRef.current = window.setTimeout(() => {
+        setSaveState("idle");
+        savedStatusTimerRef.current = null;
+      }, 900);
       setError(null);
     } catch (cause) {
       setError(errorMessage(cause, t));
@@ -405,6 +423,9 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     return () => {
       if (autoSaveTimerRef.current !== null) {
         window.clearTimeout(autoSaveTimerRef.current);
+      }
+      if (savedStatusTimerRef.current !== null) {
+        window.clearTimeout(savedStatusTimerRef.current);
       }
     };
   }, []);
@@ -478,7 +499,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     saveState,
     operation,
     error,
-    statusText,
+    statusText: settledStatusText,
     shouldReturnHome,
     isConnected,
     isDirty,
