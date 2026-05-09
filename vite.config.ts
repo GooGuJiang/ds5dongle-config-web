@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
-const appVersion = "0.1.7";
+const appVersion = "0.1.8";
 
 export default defineConfig({
   plugins: [
