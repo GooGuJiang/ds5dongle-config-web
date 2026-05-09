@@ -8,6 +8,18 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import type { ThemeMode } from "@/hooks/useTheme";
 
+const headerMotionTransition = {
+  type: "tween" as const,
+  duration: 0.18,
+  ease: "circOut" as const,
+};
+
+const headerFadeTransition = {
+  type: "tween" as const,
+  duration: 0.12,
+  ease: "easeOut" as const,
+};
+
 interface AppHeaderProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
@@ -66,7 +78,7 @@ const showControlBar = Boolean(statusText || showDeviceActions);
   return (
     <header className="app-header">
       <LayoutGroup>
-      <motion.div className="brand-lockup" layout>
+      <motion.div className="brand-lockup" layout transition={headerMotionTransition}>
         <AnimatePresence initial={false}>
           {showBackButton && (
             <motion.div
@@ -75,7 +87,7 @@ const showControlBar = Boolean(statusText || showDeviceActions);
               initial={{ width: 0, opacity: 0, x: -8, scale: 0.92 }}
               animate={{ width: 34, opacity: 1, x: 0, scale: 1 }}
               exit={{ width: 0, opacity: 0, x: -8, scale: 0.92 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              transition={headerMotionTransition}
               className="header-back-motion-slot"
             >
               <Button
@@ -92,16 +104,16 @@ const showControlBar = Boolean(statusText || showDeviceActions);
             </motion.div>
           )}
         </AnimatePresence>
-        <motion.div className="brand-main" layout>
+        <motion.div className="brand-main" layout transition={headerMotionTransition}>
           <img className="app-icon" src="/pwa-icon.svg" alt="" aria-hidden="true" />
           <h1>{t("app.title")}</h1>
         </motion.div>
       </motion.div>
-      <motion.div className="header-actions" layout>
-        <motion.div layout className="header-action-slot">
+      <motion.div className="header-actions" layout transition={headerMotionTransition}>
+        <motion.div layout transition={headerMotionTransition} className="header-action-slot">
           <LanguageSwitcher />
         </motion.div>
-        <motion.div layout className="header-action-slot">
+        <motion.div layout transition={headerMotionTransition} className="header-action-slot">
           <ThemeSwitcher theme={theme} onThemeChange={onThemeChange} />
         </motion.div>
         <AnimatePresence initial={false} mode="popLayout">
@@ -110,18 +122,18 @@ const showControlBar = Boolean(statusText || showDeviceActions);
               key={showControlBar ? "header-device-control-bar" : "header-device-control-spacer"}
               className={`header-device-control-motion-slot ${showControlSpacer ? "is-spacer" : ""}`}
               layout
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: showControlSpacer ? 0 : "auto", opacity: showControlSpacer ? 0 : 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: "easeInOut" }}
+              initial={{ maxWidth: 0, opacity: 0 }}
+              animate={{ maxWidth: showControlSpacer ? 0 : 720, opacity: showControlSpacer ? 0 : 1 }}
+              exit={{ maxWidth: 0, opacity: 0 }}
+              transition={headerMotionTransition}
             >
               {showControlBar && (
                 <motion.div
                   className="header-device-control-bar"
-                  initial={{ opacity: 0, x: 18, scale: 0.98 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 18, scale: 0.98 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={headerFadeTransition}
                 >
                   {displayStatusText && (
                     <div className="header-status" role="status" aria-live="polite">

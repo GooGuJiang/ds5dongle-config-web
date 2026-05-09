@@ -353,6 +353,7 @@ button:disabled {
   min-width: 0;
   overflow: hidden;
   transform: translateX(0);
+  will-change: max-width, opacity;
 }
 
 .header-device-control-motion-slot.is-spacer {
@@ -372,6 +373,7 @@ button:disabled {
   border: 0;
   border-radius: 8px;
   box-shadow: none;
+  will-change: transform, opacity;
 }
 
 .header-device-action-button {
@@ -561,6 +563,22 @@ h2 {
   animation: page-fade-in 320ms ease-out both;
 }
 
+.app-version-watermark {
+  position: fixed;
+  right: clamp(12px, 2vw, 24px);
+  bottom: clamp(10px, 2vh, 20px);
+  z-index: 1;
+  color: var(--muted-foreground);
+  font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  opacity: 0.32;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .device-strip-card {
   width: min(310px, calc((100svh - 250px) * 0.58), 100%);
   min-width: min(100%, 238px);
@@ -718,10 +736,17 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   color: var(--device-muted);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.device-battery-icon {
+  flex: 0 0 auto;
+  margin-top: 0;
+  color: currentcolor;
+  transform: rotate(90deg);
 }
 
 .device-scan-icon {
@@ -775,6 +800,20 @@ h2 {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes settings-view-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+    filter: blur(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
   }
 }
 
@@ -877,6 +916,84 @@ h2 {
 
 .settings-detail > .panel {
   width: 100%;
+}
+
+.settings-view-transition {
+  width: 100%;
+  animation: settings-view-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform, filter;
+}
+
+.settings-view-transition > .panel {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-view-transition {
+    animation: none;
+  }
+}
+
+.about-panel {
+  display: grid;
+  gap: clamp(8px, 1.2vh, 10px);
+  background: transparent;
+}
+
+.about-info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(8px, 1.2vh, 10px);
+}
+
+.about-github-card {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 86px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.about-github-card {
+  gap: 14px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.about-github-card:hover,
+.about-github-card:focus-visible {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--settings-card));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.about-github-card svg {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.about-info-label {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.about-github-card strong {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .settings-sidebar-trigger {
@@ -1288,6 +1405,10 @@ h2 {
     padding: 12px 0 12px 12px;
   }
 
+  .about-info-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 @media (max-width: 480px) {
@@ -1297,6 +1418,11 @@ h2 {
 
   .panel {
     padding: 14px;
+  }
+
+  .about-github-card {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
 }

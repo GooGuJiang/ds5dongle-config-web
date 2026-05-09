@@ -1,5 +1,15 @@
 import { type KeyboardEvent } from "react";
-import { BatteryMedium, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import {
+  MdBattery0Bar,
+  MdBattery1Bar,
+  MdBattery2Bar,
+  MdBattery3Bar,
+  MdBattery4Bar,
+  MdBattery5Bar,
+  MdBattery6Bar,
+  MdBatteryFull,
+} from "react-icons/md";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -124,8 +134,8 @@ export function DeviceStrip({
                       </div>
                     )}
                     <div className="device-status-icons" aria-hidden="true">
-                      <span className="device-battery">
-                        <BatteryMedium size={19} />
+                      <span className="device-battery" data-battery-level={batteryLevelState(item.batteryText)}>
+                        <BatteryIcon batteryText={item.batteryText} />
                         {item.batteryText}
                       </span>
                     </div>
@@ -173,4 +183,71 @@ function deviceLabelFromDevice(device: HIDDevice): string {
 
 function deviceKey(device: HIDDevice): string {
   return `${device.vendorId}:${device.productId}:${device.productName}`;
+}
+
+function BatteryIcon({ batteryText }: { batteryText: string }) {
+  const level = batteryLevelFromText(batteryText);
+  const iconProps = { size: 22, className: "device-battery-icon", focusable: false } as const;
+
+  if (level === null) {
+    return <MdBattery0Bar {...iconProps} />;
+  }
+
+  if (level >= 95) {
+    return <MdBatteryFull {...iconProps} />;
+  }
+
+  if (level >= 82) {
+    return <MdBattery6Bar {...iconProps} />;
+  }
+
+  if (level >= 68) {
+    return <MdBattery5Bar {...iconProps} />;
+  }
+
+  if (level >= 54) {
+    return <MdBattery4Bar {...iconProps} />;
+  }
+
+  if (level >= 40) {
+    return <MdBattery3Bar {...iconProps} />;
+  }
+
+  if (level >= 26) {
+    return <MdBattery2Bar {...iconProps} />;
+  }
+
+  if (level >= 12) {
+    return <MdBattery1Bar {...iconProps} />;
+  }
+
+  return <MdBattery0Bar {...iconProps} />;
+}
+
+function batteryLevelFromText(text: string): number | null {
+  const value = Number.parseInt(text, 10);
+
+  if (Number.isNaN(value)) {
+    return null;
+  }
+
+  return Math.min(Math.max(value, 0), 100);
+}
+
+function batteryLevelState(text: string): "unknown" | "low" | "medium" | "high" {
+  const level = batteryLevelFromText(text);
+
+  if (level === null) {
+    return "unknown";
+  }
+
+  if (level <= 20) {
+    return "low";
+  }
+
+  if (level <= 60) {
+    return "medium";
+  }
+
+  return "high";
 }

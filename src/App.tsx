@@ -1,7 +1,15 @@
-import { useEffect, useState, useCallback, type CSSProperties } from "react";
-import { Info, Settings } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Info } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import {
+  APP_METADATA,
+  APP_TOAST_OPTIONS,
+  SETTINGS_NAV_ITEMS,
+  SETTINGS_SIDEBAR_PROVIDER_STYLE,
+  type AppView,
+} from "./appConfig";
 import { AppHeader } from "./components/AppHeader";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
@@ -21,8 +29,6 @@ import {
 import { useDs5Bridge } from "./hooks/useDs5Bridge";
 import { useTheme } from "./hooks/useTheme";
 
-type AppView = "home" | "settings";
-
 export default function App() {
   const bridge = useDs5Bridge();
   const theme = useTheme();
@@ -38,7 +44,7 @@ export default function App() {
   }, [bridge.clearReturnHome, bridge.shouldReturnHomeRef]);
 
   useEffect(() => {
-    if (!bridge.client && view === "settings" && !bridge.shouldReturnHomeRef.current) {
+    if (!bridge.client && (view === "settings" || view === "about") && !bridge.shouldReturnHomeRef.current) {
       setView("home");
     }
   }, [bridge.client, bridge.shouldReturnHome, view]);
@@ -56,34 +62,18 @@ export default function App() {
     <>
       <Toaster
         position="top-right"
-        toastOptions={{
-          className: "app-toast",
-          duration: 4200,
-          style: {
-            background: "var(--card)",
-            color: "var(--card-foreground)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            boxShadow: "0 16px 42px rgba(16, 24, 40, 0.12)",
-          },
-          error: {
-            iconTheme: {
-              primary: "var(--destructive)",
-              secondary: "var(--card)",
-            },
-          },
-        }}
+        toastOptions={APP_TOAST_OPTIONS}
       />
-      <main className={`app-shell ${view === "settings" ? "settings-mode" : ""}`}>
+        <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""}`}>
         <AppHeader
           theme={theme.theme}
           onThemeChange={theme.setTheme}
-          statusText={view === "settings" && bridge.client ? bridge.statusText : undefined}
+          statusText={(view === "settings" || view === "about") && bridge.client ? bridge.statusText : undefined}
           issues={bridge.issues.map((issue) => t(`validation.${issue.field}`))}
           needsUsbReconnect={bridge.needsUsbReconnect}
-          showBackButton={view === "settings"}
+          showBackButton={view === "settings" || view === "about"}
           onBack={() => setView("home")}
-          showDeviceActions={view === "settings" && Boolean(bridge.client)}
+          showDeviceActions={(view === "settings" || view === "about") && Boolean(bridge.client)}
           canUseDeviceActions={Boolean(bridge.client)}
           canResetToDefaults={!bridge.isDefaultConfig}
           isBusy={isBusy}
@@ -109,25 +99,29 @@ export default function App() {
                 onOpenSettings={() => setView("settings")}
               />
             </div>
+            <span className="app-version-watermark" aria-label={`${t("about.version")} v${APP_METADATA.version}`}>
+              v{APP_METADATA.version}
+            </span>
           </>
         ) : (
-          <SidebarProvider className="settings-page" style={{ "--sidebar-width": "248px" } as CSSProperties}>
+          <SidebarProvider className="settings-page" style={SETTINGS_SIDEBAR_PROVIDER_STYLE}>
             <Sidebar className="settings-sidebar" collapsible="icon" aria-label={t("settings.navigation")}>
               <SidebarContent className="settings-sidebar-content">
                 <SidebarGroup>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {[
-                        { icon: Settings, label: t("settings.nav.settings"), active: true },
-                        { icon: Info, label: t("settings.nav.about") },
-                      ].map((item) => (
-                        <SidebarMenuItem key={item.label}>
-                          <SidebarMenuButton type="button" isActive={item.active} tooltip={item.label}>
+                      {SETTINGS_NAV_ITEMS.map((item) => {
+                        const label = t(item.labelKey);
+
+                        return (
+                        <SidebarMenuItem key={item.labelKey}>
+                          <SidebarMenuButton type="button" isActive={view === item.view} tooltip={label} onClick={() => setView(item.view)}>
                             <item.icon />
-                            <span>{item.label}</span>
+                            <span>{label}</span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
-                      ))}
+                        );
+                      })}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
@@ -136,7 +130,28 @@ export default function App() {
             </Sidebar>
 
             <SidebarInset className="settings-detail">
-              <ConfigPanel bridge={bridge} onProgressComplete={handleProgressComplete} />
+              <div key={view} className="settings-view-transition">
+                {view === "settings" ? (
+                  <ConfigPanel bridge={bridge} onProgressComplete={handleProgressComplete} />
+                ) : (
+                  <section className="panel about-panel" aria-labelledby="about-title">
+                  <div className="panel-title about-panel-title">
+                    <Info size={18} />
+                    <h2 id="about-title">{t("about.title")}</h2>
+                  </div>
+
+                  <div className="about-info-grid">
+                    <a className="config-section about-github-card" href={APP_METADATA.githubUrl} target="_blank" rel="noreferrer">
+                      <FaGithub aria-hidden="true" />
+                      <span>
+                        <span className="about-info-label">{t("about.github")}</span>
+                        <strong>{APP_METADATA.githubUrl}</strong>
+                      </span>
+                    </a>
+                  </div>
+                  </section>
+                )}
+              </div>
             </SidebarInset>
           </SidebarProvider>
         )}
