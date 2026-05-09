@@ -1,7 +1,6 @@
 import { Gauge, Gamepad2, SlidersHorizontal, Volume2, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { animate } from "motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UseDs5BridgeResult } from "../hooks/useDs5Bridge";
 import { fieldIssue, ControllerMode, PollingRateMode } from "../protocol/config";
@@ -29,7 +28,7 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   const [progress, setProgress] = useState(0);
 
   const progressValueRef = useRef(0);
-  const progressAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const progressFrameRef = useRef<number | null>(null);
   const timeoutIdsRef = useRef<number[]>([]);
   const prevOperationRef = useRef(bridge.operation);
   const switchRunIdRef = useRef(0);
@@ -43,6 +42,10 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
     progressValueRef.current = nextValue;
     setProgress(nextValue);
   }, []);
+
+  const setProgressValueMonotonic = useCallback((value: number) => {
+    setProgressValue(Math.max(progressValueRef.current, value));
+  }, [setProgressValue]);
 
   const clearManagedTimeouts = useCallback(() => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
@@ -63,31 +66,44 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   }, []);
 
   const stopProgressAnimation = useCallback(() => {
-    progressAnimationRef.current?.stop();
-    progressAnimationRef.current = null;
+    if (progressFrameRef.current !== null) {
+      window.cancelAnimationFrame(progressFrameRef.current);
+      progressFrameRef.current = null;
+    }
   }, []);
 
   const animateProgressTo = useCallback(
-    (to: number, durationMs: number, runId: number) => {
+    (to: number, durationMs: number, runId: number): Promise<void> => {
       stopProgressAnimation();
 
-      const controls = animate(progressValueRef.current, to, {
-        duration: durationMs / 1000,
-        ease: "linear",
-        onUpdate: (latest) => {
-          // 防止第二次触发时，第一次动画的异步回调污染当前进度
+      const from = progressValueRef.current;
+      const startedAt = performance.now();
+
+      return new Promise((resolve) => {
+        const tick = (now: number) => {
           if (switchRunIdRef.current !== runId) {
+            progressFrameRef.current = null;
+            resolve();
             return;
           }
 
-          setProgressValue(latest);
-        },
-      });
+          const elapsed = now - startedAt;
+          const ratio = durationMs <= 0 ? 1 : Math.min(1, elapsed / durationMs);
+          setProgressValueMonotonic(from + (to - from) * ratio);
 
-      progressAnimationRef.current = controls;
-      return controls;
+          if (ratio >= 1) {
+            progressFrameRef.current = null;
+            resolve();
+            return;
+          }
+
+          progressFrameRef.current = window.requestAnimationFrame(tick);
+        };
+
+        progressFrameRef.current = window.requestAnimationFrame(tick);
+      });
     },
-    [setProgressValue, stopProgressAnimation],
+    [setProgressValueMonotonic, stopProgressAnimation],
   );
 
   const startProgressAnimation = useCallback(
@@ -126,14 +142,12 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
       const remainingProgress = 100 - progressValueRef.current;
       const finishDurationMs = Math.max(300, remainingProgress * 10);
 
-      const controls = animateProgressTo(100, finishDurationMs, runId);
-      await controls;
+      await animateProgressTo(100, finishDurationMs, runId);
 
       if (switchRunIdRef.current !== runId) {
         return;
       }
 
-      progressAnimationRef.current = null;
       setProgressValue(100);
 
       // 让用户看到 100%
@@ -185,7 +199,6 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   // 处理回报率切换
   const handlePollingRateChange = (value: PollingRateMode) => {
     const isChanged = bridge.draft.pollingRateMode !== value;
-    bridge.setDraftField("pollingRateMode", value);
 
     if (isChanged && bridge.isConnected) {
       startProgressAnimation(
@@ -193,12 +206,13 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
         t("config.switchingPollingRateDescription"),
       );
     }
+
+    bridge.setDraftField("pollingRateMode", value);
   };
 
   // 处理模式切换
   const handleControllerModeChange = (value: ControllerMode) => {
     const isChanged = bridge.draft.controllerMode !== value;
-    bridge.setDraftField("controllerMode", value);
 
     if (isChanged && bridge.isConnected) {
       startProgressAnimation(
@@ -206,6 +220,8 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
         t("config.switchingControllerModeDescription"),
       );
     }
+
+    bridge.setDraftField("controllerMode", value);
   };
 
   return (

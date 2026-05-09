@@ -33,7 +33,7 @@ export function SwitchProgressDialog({
           )}
         </DialogHeader>
         <div className="flex flex-col gap-4 py-4">
-          <Progress value={progress} className="w-full" />
+          <Progress value={progress} className="w-full [&_[data-slot=progress-indicator]]:transition-none" />
           <p className="text-sm text-muted-foreground text-center">
             {t("config.switchingProgress", { progress: Math.round(progress) })}
           </p>
