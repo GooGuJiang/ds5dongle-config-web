@@ -25,7 +25,9 @@ export interface UseDs5BridgeResult {
   supported: boolean;
   client: Ds5BridgeHidClient | null;
   deviceLabel: string;
+  deviceSerialNumber: string;
   batteryText: string;
+  authorizedDeviceSerialNumber: Record<string, string>;
   authorizedDeviceBatteryText: Record<string, string>;
   authorizedDevices: HIDDevice[];
   config: ConfigBody | null;
@@ -67,6 +69,8 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const [shouldReturnHome, setShouldReturnHome] = useState(false);
   const shouldReturnHomeRef = useRef(false);
   const [batteryText, setBatteryText] = useState("--");
+  const [deviceSerialNumber, setDeviceSerialNumber] = useState("--");
+  const [authorizedDeviceSerialNumber, setAuthorizedDeviceSerialNumber] = useState<Record<string, string>>({});
   const [authorizedDeviceBatteryText, setAuthorizedDeviceBatteryText] = useState<Record<string, string>>({});
   const [settledStatusText, setSettledStatusText] = useState(t("status.ready"));
   const clientRef = useRef<Ds5BridgeHidClient | null>(null);
@@ -124,27 +128,31 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     setAuthorizedDevices(await Ds5BridgeHidClient.authorizedDevices());
   }, [supported]);
 
-  const scanAuthorizedDeviceBattery = useCallback(async (devices: HIDDevice[]) => {
+  const scanAuthorizedDeviceInfo = useCallback(async (devices: HIDDevice[]) => {
     const entries = await Promise.all(
       devices.map(async (device) => {
         if (clientRef.current?.device === device) {
-          return [deviceKey(device), batteryText] as const;
+          return [deviceKey(device), { batteryText, serialNumber: deviceSerialNumber }] as const;
         }
 
         const nextClient = new Ds5BridgeHidClient(device);
         try {
           await nextClient.open();
-          const nextBatteryText = await listenForBatteryText(device, 900);
+          const [nextBatteryText, nextSerialNumber] = await Promise.all([
+            listenForBatteryText(device, 900),
+            nextClient.readSerialNumber().catch(() => "--"),
+          ]);
           await nextClient.close();
-          return [deviceKey(device), nextBatteryText ?? "--"] as const;
+          return [deviceKey(device), { batteryText: nextBatteryText ?? "--", serialNumber: nextSerialNumber || "--" }] as const;
         } catch {
-          return [deviceKey(device), "--"] as const;
+          return [deviceKey(device), { batteryText: "--", serialNumber: "--" }] as const;
         }
       }),
     );
 
-    setAuthorizedDeviceBatteryText(Object.fromEntries(entries));
-  }, [batteryText]);
+    setAuthorizedDeviceBatteryText(Object.fromEntries(entries.map(([key, value]) => [key, value.batteryText])));
+    setAuthorizedDeviceSerialNumber(Object.fromEntries(entries.map(([key, value]) => [key, value.serialNumber])));
+  }, [batteryText, deviceSerialNumber]);
 
   const readConfigWithClient = useCallback(async (nextClient: Ds5BridgeHidClient, syncUsbEffectiveConfig = false) => {
     setOperation("reading");
@@ -176,6 +184,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     setNeedsUsbReconnect(false);
     setSaveState("idle");
     setBatteryText("--");
+    setDeviceSerialNumber("--");
   }, []);
 
   const attachClient = useCallback(
@@ -190,6 +199,11 @@ export function useDs5Bridge(): UseDs5BridgeResult {
         setOperation(null);
       }
       await readConfigWithClient(nextClient, true);
+      try {
+        setDeviceSerialNumber((await nextClient.readSerialNumber()) || "--");
+      } catch {
+        setDeviceSerialNumber("--");
+      }
     },
     [readConfigWithClient],
   );
@@ -417,11 +431,12 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   useEffect(() => {
     if (authorizedDevices.length === 0) {
       setAuthorizedDeviceBatteryText({});
+      setAuthorizedDeviceSerialNumber({});
       return;
     }
 
-    void scanAuthorizedDeviceBattery(authorizedDevices);
-  }, [authorizedDevices, scanAuthorizedDeviceBattery]);
+    void scanAuthorizedDeviceInfo(authorizedDevices);
+  }, [authorizedDevices, scanAuthorizedDeviceInfo]);
 
   useEffect(() => {
     return () => {
@@ -494,7 +509,9 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     supported,
     client,
     deviceLabel,
+    deviceSerialNumber,
     batteryText,
+    authorizedDeviceSerialNumber,
     authorizedDeviceBatteryText,
     authorizedDevices,
     config,

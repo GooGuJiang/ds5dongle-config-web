@@ -721,6 +721,17 @@ h2 {
   white-space: nowrap;
 }
 
+.device-serial-number {
+  max-width: calc(100% - 72px);
+  overflow: hidden;
+  color: var(--device-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .device-battery {
   display: inline-flex;
   align-items: center;

@@ -96,9 +96,11 @@ export default function App() {
             <div className="device-stage-wrap">
               <DeviceStrip
                 authorizedDevices={bridge.authorizedDevices}
+                authorizedDeviceSerialNumber={bridge.authorizedDeviceSerialNumber}
                 authorizedDeviceBatteryText={bridge.authorizedDeviceBatteryText}
                 client={bridge.client}
                 batteryText={bridge.batteryText}
+                deviceSerialNumber={bridge.deviceSerialNumber}
                 deviceLabel={bridge.deviceLabel}
                 isBusy={isBusy}
                 supported={bridge.supported}

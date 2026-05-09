@@ -50,6 +50,7 @@ export const en = {
     autoDetect: "Looking for previously allowed devices automatically",
     authorizedList: "Authorized device list",
     selectToConnect: "Click to connect this device",
+    serialNumber: "Serial: {{serialNumber}}",
     detectHint: "Bluetooth direct connections cannot be detected. Use a 2.4G receiver or USB cable to connect the adapter.",
   },
   settings: {

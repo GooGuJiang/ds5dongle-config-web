@@ -6,9 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface DeviceStripProps {
   authorizedDevices: HIDDevice[];
+  authorizedDeviceSerialNumber: Record<string, string>;
   authorizedDeviceBatteryText: Record<string, string>;
   client: unknown | null;
   batteryText: string;
+  deviceSerialNumber: string;
   deviceLabel: string;
   isBusy: boolean;
   supported: boolean;
@@ -19,9 +21,11 @@ interface DeviceStripProps {
 
 export function DeviceStrip({
   authorizedDevices,
+  authorizedDeviceSerialNumber,
   authorizedDeviceBatteryText,
   client,
   batteryText,
+  deviceSerialNumber,
   deviceLabel,
   isBusy,
   supported,
@@ -31,7 +35,7 @@ export function DeviceStrip({
 }: DeviceStripProps) {
   const { t } = useTranslation();
   const connectedDevice = client
-    ? [{ key: deviceLabel, label: deviceLabel, batteryText, connected: true, device: null }]
+    ? [{ key: deviceLabel, label: deviceLabel, batteryText, serialNumber: deviceSerialNumber, connected: true, device: null }]
     : [];
   const pairedDevices = client
     ? connectedDevice
@@ -39,6 +43,7 @@ export function DeviceStrip({
         key: `${device.vendorId}:${device.productId}:${device.productName}`,
         label: deviceLabelFromDevice(device),
         batteryText: authorizedDeviceBatteryText[deviceKey(device)] ?? "--",
+        serialNumber: authorizedDeviceSerialNumber[deviceKey(device)] ?? "--",
         connected: false,
         device,
       }));
@@ -82,7 +87,7 @@ export function DeviceStrip({
       <div className="device-card-grid">
         {hasPairedDevice ? (
           pairedDevices.map((item) => {
-            const [deviceName, deviceId] = item.label.split(" · ");
+            const [deviceName] = item.label.split(" · ");
             const isEdge = deviceName.includes("Edge");
             const controllerImage = isEdge
               ? { src: "/images/ps5-controller-edge.webp", width: 1240, height: 916 }
@@ -111,9 +116,13 @@ export function DeviceStrip({
                       <strong>
                         <span>{deviceName}</span>
                       </strong>
-                      {!item.connected && <p>{t("device.selectToConnect")}</p>}
+                      {!item.connected && item.serialNumber === "--" && <p>{t("device.selectToConnect")}</p>}
                     </div>
-                    {deviceId && <div className="device-id-badge">{deviceId}</div>}
+                    {item.serialNumber !== "--" && (
+                      <div className="device-serial-number" title={item.serialNumber}>
+                        {t("device.serialNumber", { serialNumber: item.serialNumber })}
+                      </div>
+                    )}
                     <div className="device-status-icons" aria-hidden="true">
                       <span className="device-battery">
                         <BatteryMedium size={19} />
