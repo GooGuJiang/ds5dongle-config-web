@@ -51,6 +51,8 @@ export const zh = {
     authorizedList: "已授权设备列表",
     selectToConnect: "点击连接此设备",
     serialNumber: "序列号：{{serialNumber}}",
+    showSerialNumber: "显示完整序列号",
+    hideSerialNumber: "隐藏序列号",
     detectHint: "无法识别蓝牙直连的手柄，请使用 2.4G 接收器或 USB 线连接 Pico。",
   },
   settings: {

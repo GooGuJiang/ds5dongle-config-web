@@ -1,5 +1,5 @@
-import { type KeyboardEvent } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import {
   MdBattery0Bar,
   MdBattery1Bar,
@@ -11,8 +11,11 @@ import {
   MdBatteryFull,
 } from "react-icons/md";
 import { useTranslation } from "react-i18next";
+import { Tooltip } from "react-tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+
+const SERIAL_VISIBILITY_STORAGE_KEY = "ds5dongle:showSerialNumber";
 
 interface DeviceStripProps {
   authorizedDevices: HIDDevice[];
@@ -44,6 +47,7 @@ export function DeviceStrip({
   onOpenSettings,
 }: DeviceStripProps) {
   const { t } = useTranslation();
+  const [showSerialNumber, setShowSerialNumber] = useState(() => readStoredSerialVisibility());
   const connectedDevice = client
     ? [{ key: deviceLabel, label: deviceLabel, batteryText, serialNumber: deviceSerialNumber, connected: true, device: null }]
     : [];
@@ -58,6 +62,14 @@ export function DeviceStrip({
         device,
       }));
   const hasPairedDevice = pairedDevices.length > 0;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SERIAL_VISIBILITY_STORAGE_KEY, showSerialNumber ? "1" : "0");
+    } catch {
+      // Ignore storage failures, e.g. private mode or disabled localStorage.
+    }
+  }, [showSerialNumber]);
 
   const openSettingsFromCard = () => {
     if (client) {
@@ -90,6 +102,11 @@ export function DeviceStrip({
 
     event.preventDefault();
     void openAuthorizedDevice(device);
+  };
+
+  const toggleSerialVisibility = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setShowSerialNumber((value) => !value);
   };
 
   return (
@@ -129,8 +146,19 @@ export function DeviceStrip({
                       {!item.connected && item.serialNumber === "--" && <p>{t("device.selectToConnect")}</p>}
                     </div>
                     {item.serialNumber !== "--" && (
-                      <div className="device-serial-number" title={item.serialNumber}>
-                        {t("device.serialNumber", { serialNumber: item.serialNumber })}
+                      <div className="device-serial-number">
+                        <span>{t("device.serialNumber", { serialNumber: showSerialNumber ? item.serialNumber : maskSerialNumber(item.serialNumber) })}</span>
+                        <button
+                          type="button"
+                          className="device-serial-visibility"
+                          onClick={toggleSerialVisibility}
+                          aria-label={showSerialNumber ? t("device.hideSerialNumber") : t("device.showSerialNumber")}
+                          data-tooltip-id="device-serial-tooltip"
+                          data-tooltip-content={showSerialNumber ? t("device.hideSerialNumber") : t("device.showSerialNumber")}
+                          data-tooltip-place="top"
+                        >
+                          {showSerialNumber ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
                       </div>
                     )}
                     <div className="device-status-icons" aria-hidden="true">
@@ -172,6 +200,7 @@ export function DeviceStrip({
         </div>
       )}
       {!supported && <p className="device-hint">{t("notice.webHidUnsupported")}</p>}
+      <Tooltip id="device-serial-tooltip" place="top" positionStrategy="fixed" />
     </section>
   );
 }
@@ -183,6 +212,19 @@ function deviceLabelFromDevice(device: HIDDevice): string {
 
 function deviceKey(device: HIDDevice): string {
   return `${device.vendorId}:${device.productId}:${device.productName}`;
+}
+
+function readStoredSerialVisibility(): boolean {
+  try {
+    return window.localStorage.getItem(SERIAL_VISIBILITY_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function maskSerialNumber(serialNumber: string): string {
+  const visiblePrefixLength = Math.min(6, serialNumber.length);
+  return `${serialNumber.slice(0, visiblePrefixLength)}${"*".repeat(serialNumber.length - visiblePrefixLength)}`;
 }
 
 function BatteryIcon({ batteryText }: { batteryText: string }) {

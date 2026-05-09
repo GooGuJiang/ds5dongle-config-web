@@ -297,12 +297,14 @@ button:disabled {
 .header-back-motion-slot {
   display: inline-flex;
   flex: 0 0 auto;
-  overflow: visible;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 
 .header-back-button {
   width: 34px;
   height: 34px;
+  flex: 0 0 34px;
   margin-left: 0;
   color: var(--foreground);
   border-radius: 999px;
@@ -701,7 +703,7 @@ h2 {
 .device-status-icons {
   position: absolute;
   right: clamp(14px, 2.2vw, 20px);
-  bottom: clamp(12px, 2vh, 18px);
+  bottom: clamp(14px, 2vh, 18px);
   display: grid;
   align-items: center;
   color: var(--device-icon);
@@ -722,14 +724,54 @@ h2 {
 }
 
 .device-serial-number {
-  max-width: calc(100% - 72px);
-  overflow: hidden;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 56px);
+  margin-top: -20px;
+  padding-right: 24px;
+  overflow: visible;
   color: var(--device-muted);
   font-size: 0.72rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
   line-height: 1.15;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.device-serial-number span {
+  min-width: 0;
+  overflow: visible;
+  overflow-wrap: normal;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.device-serial-visibility {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--device-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.device-serial-visibility:hover,
+.device-serial-visibility:focus-visible {
+  color: var(--device-text);
+  background: color-mix(in srgb, var(--device-text) 9%, transparent);
 }
 
 .device-battery {

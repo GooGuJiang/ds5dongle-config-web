@@ -51,6 +51,8 @@ export const en = {
     authorizedList: "Authorized device list",
     selectToConnect: "Click to connect this device",
     serialNumber: "Serial: {{serialNumber}}",
+    showSerialNumber: "Show full serial number",
+    hideSerialNumber: "Hide serial number",
     detectHint: "Bluetooth direct connections cannot be detected. Use a 2.4G receiver or USB cable to connect the Pico.",
   },
   settings: {
