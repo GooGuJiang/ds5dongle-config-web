@@ -11,9 +11,10 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Battery, BatteryFull, ChevronRight, CircleAlert, Radio } from "lucide-react";
+import { Battery, BatteryFull, ChevronRight, CircleAlert, Radio, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarDeviceCardProps {
   authorizedDevices: HIDDevice[];
@@ -25,6 +26,9 @@ interface SidebarDeviceCardProps {
   batteryText: string;
   firmwareVersion: string;
   signalStrength: string;
+  firmwareUpdateAvailable?: boolean;
+  firmwareUpdateVersion?: string;
+  onFirmwareUpdateClick?: () => void;
   onSelectDevice: (device: HIDDevice) => Promise<void> | void;
 }
 
@@ -38,6 +42,9 @@ export function SidebarDeviceCard({
   batteryText,
   firmwareVersion,
   signalStrength,
+  firmwareUpdateAvailable = false,
+  firmwareUpdateVersion,
+  onFirmwareUpdateClick,
   onSelectDevice,
 }: SidebarDeviceCardProps) {
   const { t } = useTranslation();
@@ -81,6 +88,41 @@ export function SidebarDeviceCard({
         </span>
         <span className="settings-device-card-copy">
           <strong>{deviceName}</strong>
+          {firmwareUpdateAvailable && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="settings-device-card-update"
+                    aria-label={t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setIsOpen(false);
+                      onFirmwareUpdateClick?.();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setIsOpen(false);
+                      onFirmwareUpdateClick?.();
+                    }}
+                  >
+                    <RefreshCw size={14} aria-hidden="true" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>
+                  {t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </span>
         <ChevronRight size={16} aria-hidden="true" />
       </button>

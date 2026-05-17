@@ -343,6 +343,58 @@ button:disabled {
   transition: transform 180ms ease;
 }
 
+.brand-update-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  align-self: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0 8px;
+  color: #16a34a;
+  cursor: pointer;
+  background: rgb(34 197 94 / 14%);
+  border: 1px solid rgb(34 197 94 / 34%);
+  border-radius: 999px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.brand-update-button span {
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand-update-button:hover,
+.brand-update-button:focus-visible {
+  color: #15803d;
+  background: rgb(34 197 94 / 22%);
+  border-color: rgb(34 197 94 / 52%);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.dark .brand-update-button {
+  color: #4ade80;
+  background: rgb(34 197 94 / 14%);
+  border-color: rgb(74 222 128 / 30%);
+}
+
+.dark .brand-update-button:hover,
+.dark .brand-update-button:focus-visible {
+  color: #86efac;
+  background: rgb(34 197 94 / 22%);
+  border-color: rgb(74 222 128 / 48%);
+}
+
 .brand-lockup:has(.header-back-motion-slot) .brand-main {
   transform: translateX(4px);
 }
@@ -1031,6 +1083,7 @@ h2 {
 }
 
 .settings-device-card-trigger {
+  position: relative;
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr) 16px;
   align-items: center;
@@ -1084,8 +1137,10 @@ h2 {
 
 .settings-device-card-copy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
 }
 
 .settings-device-card-copy strong {
@@ -1094,6 +1149,45 @@ h2 {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-device-card-update {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: #16a34a;
+  cursor: pointer;
+  background: rgb(34 197 94 / 14%);
+  border: 1px solid rgb(34 197 94 / 34%);
+  border-radius: 999px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-device-card-update:hover,
+.settings-device-card-update:focus-visible {
+  color: #15803d;
+  background: rgb(34 197 94 / 22%);
+  border-color: rgb(34 197 94 / 52%);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.dark .settings-device-card-update {
+  color: #4ade80;
+  background: rgb(34 197 94 / 14%);
+  border-color: rgb(74 222 128 / 30%);
+}
+
+.dark .settings-device-card-update:hover,
+.dark .settings-device-card-update:focus-visible {
+  color: #86efac;
+  background: rgb(34 197 94 / 22%);
+  border-color: rgb(74 222 128 / 48%);
 }
 
 .settings-device-card-meta {
@@ -1138,6 +1232,18 @@ h2 {
 [data-slot="sidebar"][data-state="collapsed"] .settings-device-card-copy,
 [data-slot="sidebar"][data-state="collapsed"] .settings-device-card-trigger > svg {
   display: none;
+}
+
+[data-slot="sidebar"][data-state="collapsed"] .settings-device-card-trigger:has(.settings-device-card-update)::after {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  content: "";
+  background: #22c55e;
+  border: 2px solid var(--sidebar);
+  border-radius: 999px;
 }
 
 .settings-device-popover {

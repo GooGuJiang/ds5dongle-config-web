@@ -2,6 +2,8 @@ export const en = {
   app: {
     eyebrow: "WebHID",
     title: "DS5 Dongle Web",
+    updateAvailable: "Web update available: {{version}}",
+    updateBadge: "New {{version}}",
   },
   language: {
     label: "Language",
@@ -79,6 +81,7 @@ export const en = {
     serialNumber: "Serial: {{serialNumber}}",
     battery: "Battery: {{battery}}",
     firmwareVersion: "Pico firmware: {{version}}",
+    firmwareUpdateAvailable: "Pico update available: {{version}}",
     signalStrength: "Signal: {{signal}}",
     showSerialNumber: "Show full serial number",
     hideSerialNumber: "Hide serial number",

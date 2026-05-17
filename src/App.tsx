@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Info } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
@@ -47,6 +47,8 @@ export default function App() {
   const [pwaUpdateResult, setPwaUpdateResult] = useState<PwaUpdateCheckResult | null>(null);
   const [pwaUpdateDialogOpen, setPwaUpdateDialogOpen] = useState(false);
   const [pwaUpdating, setPwaUpdating] = useState(false);
+  const dismissedFirmwareUpdateKeyRef = useRef(readDismissedUpdateKey(FIRMWARE_UPDATE_DISMISSED_KEY));
+  const dismissedPwaUpdateKeyRef = useRef(readDismissedUpdateKey(PWA_UPDATE_DISMISSED_KEY));
   const isBusy = bridge.operation !== null;
   // 进度条完成后切换回主页（仅在模式切换场景下触发）
   const handleProgressComplete = useCallback(() => {
@@ -84,8 +86,13 @@ export default function App() {
           return;
         }
 
+        const updateKey = firmwareUpdatePromptKey(result);
+
         setFirmwareUpdateResult(result);
-        setFirmwareUpdateDialogOpen(true);
+
+        if (dismissedFirmwareUpdateKeyRef.current !== updateKey) {
+          setFirmwareUpdateDialogOpen(true);
+        }
       })
       .catch((error) => {
         if (!abortController.signal.aborted) {
@@ -105,8 +112,13 @@ export default function App() {
           return;
         }
 
+        const updateKey = pwaUpdatePromptKey(result);
+
         setPwaUpdateResult(result);
-        setPwaUpdateDialogOpen(true);
+
+        if (dismissedPwaUpdateKeyRef.current !== updateKey) {
+          setPwaUpdateDialogOpen(true);
+        }
       })
       .catch((error) => {
         if (!abortController.signal.aborted) {
@@ -116,6 +128,36 @@ export default function App() {
 
     return () => abortController.abort();
   }, []);
+
+  const handleFirmwareUpdateDialogOpenChange = useCallback((open: boolean) => {
+    setFirmwareUpdateDialogOpen(open);
+
+    if (!open && firmwareUpdateResult?.updateAvailable) {
+      dismissedFirmwareUpdateKeyRef.current = firmwareUpdatePromptKey(firmwareUpdateResult);
+      writeDismissedUpdateKey(FIRMWARE_UPDATE_DISMISSED_KEY, dismissedFirmwareUpdateKeyRef.current);
+    }
+  }, [firmwareUpdateResult]);
+
+  const handleOpenFirmwareUpdateDialog = useCallback(() => {
+    if (firmwareUpdateResult?.updateAvailable) {
+      setFirmwareUpdateDialogOpen(true);
+    }
+  }, [firmwareUpdateResult]);
+
+  const handleOpenPwaUpdateDialog = useCallback(() => {
+    if (pwaUpdateResult?.updateAvailable) {
+      setPwaUpdateDialogOpen(true);
+    }
+  }, [pwaUpdateResult]);
+
+  const handlePwaUpdateDialogOpenChange = useCallback((open: boolean) => {
+    setPwaUpdateDialogOpen(open);
+
+    if (!open && pwaUpdateResult?.updateAvailable) {
+      dismissedPwaUpdateKeyRef.current = pwaUpdatePromptKey(pwaUpdateResult);
+      writeDismissedUpdateKey(PWA_UPDATE_DISMISSED_KEY, dismissedPwaUpdateKeyRef.current);
+    }
+  }, [pwaUpdateResult]);
 
   const handlePwaUpdate = useCallback(() => {
     setPwaUpdating(true);
@@ -141,19 +183,22 @@ export default function App() {
       <FirmwareUpdateDialog
         open={firmwareUpdateDialogOpen}
         result={firmwareUpdateResult}
-        onOpenChange={setFirmwareUpdateDialogOpen}
+        onOpenChange={handleFirmwareUpdateDialogOpenChange}
       />
       <PwaUpdateDialog
         open={pwaUpdateDialogOpen}
         result={pwaUpdateResult}
         updating={pwaUpdating}
-        onOpenChange={setPwaUpdateDialogOpen}
+        onOpenChange={handlePwaUpdateDialogOpenChange}
         onUpdate={handlePwaUpdate}
       />
         <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""}`}>
         <AppHeader
           theme={theme.theme}
           onThemeChange={theme.setTheme}
+          pwaUpdateAvailable={Boolean(pwaUpdateResult?.updateAvailable)}
+          pwaUpdateVersion={pwaUpdateResult?.latestRelease.tagName}
+          onPwaUpdateClick={handleOpenPwaUpdateDialog}
           statusText={(view === "settings" || view === "about") && bridge.client ? bridge.statusText : undefined}
           issues={bridge.issues.map((issue) => t(`validation.${issue.field}`))}
           needsUsbReconnect={bridge.needsUsbReconnect}
@@ -207,6 +252,9 @@ export default function App() {
                   batteryText={bridge.batteryText}
                   firmwareVersion={bridge.firmwareVersion}
                   signalStrength={bridge.signalStrength}
+                  firmwareUpdateAvailable={Boolean(firmwareUpdateResult?.updateAvailable)}
+                  firmwareUpdateVersion={firmwareUpdateResult?.latestRelease.tagName}
+                  onFirmwareUpdateClick={handleOpenFirmwareUpdateDialog}
                   onSelectDevice={bridge.connectAuthorized}
                 />
                 <SidebarGroup>
@@ -261,4 +309,31 @@ export default function App() {
       </main>
     </>
   );
+}
+
+const FIRMWARE_UPDATE_DISMISSED_KEY = "firmware-update-dismissed-key";
+const PWA_UPDATE_DISMISSED_KEY = "pwa-update-dismissed-key";
+
+function firmwareUpdatePromptKey(result: FirmwareUpdateCheckResult): string {
+  return `${result.currentVersion}->${result.latestRelease.tagName}`;
+}
+
+function pwaUpdatePromptKey(result: PwaUpdateCheckResult): string {
+  return `${result.currentVersion}->${result.latestRelease.tagName}`;
+}
+
+function readDismissedUpdateKey(storageKey: string): string | null {
+  try {
+    return localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeDismissedUpdateKey(storageKey: string, updateKey: string): void {
+  try {
+    localStorage.setItem(storageKey, updateKey);
+  } catch {
+    // Ignore storage failures; the in-memory ref still prevents repeated prompts in this session.
+  }
 }

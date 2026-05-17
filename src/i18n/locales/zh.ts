@@ -2,6 +2,8 @@ export const zh = {
   app: {
     eyebrow: "WebHID",
     title: "DS5 Dongle Web",
+    updateAvailable: "网页可更新至 {{version}}",
+    updateBadge: "新版本 {{version}}",
   },
   language: {
     label: "语言",
@@ -79,6 +81,7 @@ export const zh = {
     serialNumber: "序列号：{{serialNumber}}",
     battery: "电量：{{battery}}",
     firmwareVersion: "Pico固件：{{version}}",
+    firmwareUpdateAvailable: "Pico 可更新至 {{version}}",
     signalStrength: "信号：{{signal}}",
     showSerialNumber: "显示完整序列号",
     hideSerialNumber: "隐藏序列号",

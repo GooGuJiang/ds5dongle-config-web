@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, RefreshCw, RotateCcw } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Tooltip } from "react-tooltip";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ const headerFadeTransition = {
 interface AppHeaderProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
+  pwaUpdateAvailable?: boolean;
+  pwaUpdateVersion?: string;
+  onPwaUpdateClick?: () => void;
   statusText?: string;
   issues?: string[];
   needsUsbReconnect?: boolean;
@@ -39,6 +42,9 @@ interface AppHeaderProps {
 export function AppHeader({
   theme,
   onThemeChange,
+  pwaUpdateAvailable = false,
+  pwaUpdateVersion,
+  onPwaUpdateClick,
   statusText,
   issues = [],
   needsUsbReconnect = false,
@@ -107,6 +113,20 @@ const showControlBar = Boolean(statusText || showDeviceActions);
         <motion.div className="brand-main" layout transition={headerMotionTransition}>
           <img className="app-icon" src="/pwa-icon.svg" alt="" aria-hidden="true" />
           <h1>{t("app.title")}</h1>
+          {pwaUpdateAvailable && (
+            <button
+              type="button"
+              className="brand-update-button"
+              onClick={onPwaUpdateClick}
+              aria-label={t("app.updateAvailable", { version: pwaUpdateVersion })}
+              data-tooltip-id="header-device-actions-tooltip"
+              data-tooltip-content={t("app.updateAvailable", { version: pwaUpdateVersion })}
+              data-tooltip-place="bottom"
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              <span>{t("app.updateBadge", { version: pwaUpdateVersion })}</span>
+            </button>
+          )}
         </motion.div>
       </motion.div>
       <motion.div className="header-actions" layout transition={headerMotionTransition}>
