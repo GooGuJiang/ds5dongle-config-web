@@ -75,7 +75,9 @@ updateServiceWorker = registerSW({
   },
 
   async onNeedRefresh() {
-    toast(t("pwa.cacheRefresh"), { id: "pwa-cache-refresh" });
+    // Keep automatic service-worker refresh detection silent.
+    // The app-level PWA release dialog provides the visible update prompt,
+    // and applyPwaUpdate() still shows progress after the user chooses to update.
   },
 
   onRegisterError(error) {
