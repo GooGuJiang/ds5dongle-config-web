@@ -35,6 +35,18 @@ export const en = {
     cacheRefresh: "A new version is available. Updating the page content.",
     updateFailed: "Failed to update. Please refresh the page manually.",
   },
+  firmwareUpdate: {
+    title: "New Pico firmware available",
+    description: "Current device firmware is {{current}}. The latest GitHub release is {{latest}}.",
+    currentVersion: "Current firmware",
+    latestVersion: "Latest release",
+    latestCommit: "Latest commit",
+    releaseNotes: "Release notes",
+    highlights: "Highlights",
+    assets: "Firmware downloads",
+    later: "Later",
+    openRelease: "Open release",
+  },
   footer: {
     title: "Pico2W DualSense 5 Bridge",
     description: "Set up the Pico so a DualSense (DS5) controller can be used wirelessly.",

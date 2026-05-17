@@ -35,6 +35,18 @@ export const zh = {
     cacheRefresh: "发现新版本，正在更新页面内容",
     updateFailed: "更新失败，请手动刷新页面",
   },
+  firmwareUpdate: {
+    title: "发现新的 Pico 固件",
+    description: "当前设备固件为 {{current}}，GitHub 最新版本为 {{latest}}。",
+    currentVersion: "当前固件",
+    latestVersion: "最新版本",
+    latestCommit: "最新提交",
+    releaseNotes: "更新说明",
+    highlights: "更新要点",
+    assets: "固件下载",
+    later: "稍后再说",
+    openRelease: "打开发布页",
+  },
   footer: {
     title: "Pico2W DualSense 5 Bridge",
     description: "用于设置 Pico，让 DualSense (DS5) 手柄可以无线连接使用。",

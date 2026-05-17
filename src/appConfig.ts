@@ -6,7 +6,9 @@ export type AppView = "home" | "settings" | "about";
 
 export const APP_METADATA = {
   version: packageJson.version,
-  githubUrl: "https://github.com/GooGuJiang/DS5Dongle",
+  githubRepo: "awalol/DS5Dongle",
+  githubUrl: "https://github.com/awalol/DS5Dongle",
+  firmwareUpdateApiUrl: "https://ds5-update.g0v0.top/api/firmware/update",
 } as const;
 
 export const APP_TOAST_OPTIONS = {

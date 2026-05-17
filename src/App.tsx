@@ -14,6 +14,7 @@ import {
 import { AppHeader } from "./components/AppHeader";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
+import { FirmwareUpdateDialog } from "./components/FirmwareUpdateDialog";
 import { NoticeList } from "./components/NoticeList";
 import { SidebarDeviceCard } from "./components/SidebarDeviceCard";
 import {
@@ -30,6 +31,7 @@ import {
 } from "./components/ui/sidebar";
 import { useDs5Bridge } from "./hooks/useDs5Bridge";
 import { useTheme } from "./hooks/useTheme";
+import { checkFirmwareUpdate, shouldCheckFirmwareUpdate, type FirmwareUpdateCheckResult } from "./lib/firmwareRelease";
 
 export default function App() {
   const bridge = useDs5Bridge();
@@ -37,6 +39,8 @@ export default function App() {
   const { t } = useTranslation();
   const [view, setView] = useState<AppView>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [firmwareUpdateResult, setFirmwareUpdateResult] = useState<FirmwareUpdateCheckResult | null>(null);
+  const [firmwareUpdateDialogOpen, setFirmwareUpdateDialogOpen] = useState(false);
   const isBusy = bridge.operation !== null;
   // 进度条完成后切换回主页（仅在模式切换场景下触发）
   const handleProgressComplete = useCallback(() => {
@@ -62,6 +66,31 @@ export default function App() {
   }, [bridge.error, bridge.clearError]);
 
   useEffect(() => {
+    if ((view !== "settings" && view !== "about") || !bridge.client || !shouldCheckFirmwareUpdate(bridge.firmwareVersion)) {
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    void checkFirmwareUpdate(bridge.firmwareVersion, abortController.signal)
+      .then((result) => {
+        if (!result?.updateAvailable || abortController.signal.aborted) {
+          return;
+        }
+
+        setFirmwareUpdateResult(result);
+        setFirmwareUpdateDialogOpen(true);
+      })
+      .catch((error) => {
+        if (!abortController.signal.aborted) {
+          console.error("Firmware update check failed", error);
+        }
+      });
+
+    return () => abortController.abort();
+  }, [bridge.client, bridge.firmwareVersion, view]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia(SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY);
     const syncSidebarState = () => setSidebarOpen(!mediaQuery.matches);
 
@@ -76,6 +105,11 @@ export default function App() {
       <Toaster
         position="top-right"
         toastOptions={APP_TOAST_OPTIONS}
+      />
+      <FirmwareUpdateDialog
+        open={firmwareUpdateDialogOpen}
+        result={firmwareUpdateResult}
+        onOpenChange={setFirmwareUpdateDialogOpen}
       />
         <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""}`}>
         <AppHeader
