@@ -85,7 +85,7 @@ const showControlBar = Boolean(statusText || showDeviceActions);
               key="header-back-button"
               layout
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 34, opacity: 1, x: 0, scale: 1 }}
+              animate={{ width: 38, opacity: 1, x: 0, scale: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={headerMotionTransition}
               className="header-back-motion-slot"

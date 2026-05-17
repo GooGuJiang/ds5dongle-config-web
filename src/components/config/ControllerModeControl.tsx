@@ -16,7 +16,7 @@ export function ControllerModeControl({ value, onChange }: ControllerModeControl
   };
 
   return (
-    <div className="control-row">
+    <div className="control-row control-row-plain">
       <strong>{t("config.controllerMode")}</strong>
       <Tabs
         value={String(value)}

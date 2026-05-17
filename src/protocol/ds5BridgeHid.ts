@@ -1,5 +1,6 @@
 import {
   ConfigBody,
+  ConfigDecodeError,
   FEATURE_REPORT_PAYLOAD_SIZE,
   decodeConfigBody,
   encodeConfigBody,
@@ -68,7 +69,18 @@ export class Ds5BridgeHidClient {
   async readConfig(): Promise<ConfigBody> {
     await this.open();
     const report = await this.device.receiveFeatureReport(REPORT_GET_CONFIG);
-    return decodeConfigBody(report);
+    debugFeatureReport("readConfig receive", REPORT_GET_CONFIG, report);
+    try {
+      const config = decodeConfigBody(report);
+      debugConfig("readConfig decoded", config);
+      return config;
+    } catch (cause) {
+      if (cause instanceof ConfigDecodeError) {
+        debugConfigDecodeError(cause);
+      }
+
+      throw cause;
+    }
   }
 
   async applyConfig(config: ConfigBody): Promise<void> {
@@ -217,3 +229,36 @@ function makeCrcTable(): number[] {
 }
 
 const crcTable = makeCrcTable();
+
+function debugFeatureReport(label: string, reportId: number, data: DataView): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  console.info(`[DS5 Bridge HID] ${label}`, {
+    reportId: `0x${reportId.toString(16).padStart(2, "0")}`,
+    byteLength: data.byteLength,
+    hex: bytesToHex(bytes),
+  });
+}
+
+function debugConfig(label: string, config: ConfigBody): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  console.info(`[DS5 Bridge HID] ${label}`, config);
+}
+
+function debugConfigDecodeError(error: ConfigDecodeError): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  console.warn("[DS5 Bridge HID] readConfig decode failed", error.values);
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
+}

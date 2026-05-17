@@ -6,6 +6,7 @@ import { ConfigValidationIssue } from "../../protocol/config";
 
 interface IntegerControlProps {
   label: string;
+  description?: string;
   value: number;
   min: number;
   max: number;
@@ -13,7 +14,7 @@ interface IntegerControlProps {
   onChange: (value: number) => void;
 }
 
-export function IntegerControl({ label, value, min, max, issue, onChange }: IntegerControlProps) {
+export function IntegerControl({ label, description, value, min, max, issue, onChange }: IntegerControlProps) {
   const { t } = useTranslation();
   const [localValue, setLocalValue] = useState(value);
   const [inputText, setInputText] = useState(String(value));
@@ -67,6 +68,7 @@ export function IntegerControl({ label, value, min, max, issue, onChange }: Inte
     <label className={`control-row ${issue ? "invalid" : ""}`}>
       <span>
         <strong>{label}</strong>
+        {description && <em>{description}</em>}
         {issue && <small>{t(`validation.${issue.field}`)}</small>}
       </span>
       <div className="range-inputs">

@@ -1,7 +1,7 @@
-import { Gauge, Gamepad2, SlidersHorizontal, Volume2, Zap } from "lucide-react";
+import { Gauge, Gamepad2, Volume2, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { UseDs5BridgeResult } from "../hooks/useDs5Bridge";
 import { fieldIssue, ControllerMode, PollingRateMode } from "../protocol/config";
 import { ControllerModeControl } from "./config/ControllerModeControl";
@@ -227,13 +227,6 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
   return (
     <>
       <Card className="panel config-panel">
-        <CardHeader className="p-0">
-          <CardTitle className="panel-title">
-            <SlidersHorizontal size={18} />
-            <h2>{t("config.title")}</h2>
-          </CardTitle>
-        </CardHeader>
-
         <CardContent className="config-sections p-0">
           <section className="config-section config-section-featured">
             <div className="config-section-heading">
@@ -248,6 +241,7 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
             <div className="control-stack">
               <FloatControl
                 label={t("config.hapticsGain")}
+                description={t("config.hapticsGainDescription")}
                 value={bridge.draft.hapticsGain}
                 min={1}
                 max={2}
@@ -257,6 +251,7 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
               />
               <FloatControl
                 label={`${t("config.speakerVolume")} (%)`}
+                description={t("config.speakerVolumeDescription")}
                 value={bridge.draft.speakerVolume}
                 min={-100}
                 max={0}
@@ -272,6 +267,7 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
               />
               <IntegerControl
                 label={t("config.hapticsBufferLength")}
+                description={t("config.hapticsBufferLengthDescription")}
                 value={bridge.draft.hapticsBufferLength}
                 min={16}
                 max={128}
@@ -294,6 +290,7 @@ export function ConfigPanel({ bridge, onProgressComplete }: ConfigPanelProps) {
             <div className="control-stack compact-stack">
               <IntegerControl
                 label={`${t("config.inactiveTime")} (${t("config.inactiveTimeUnit")})`}
+                description={t("config.inactiveTimeDescription")}
                 value={bridge.draft.inactiveTime}
                 min={5}
                 max={60}

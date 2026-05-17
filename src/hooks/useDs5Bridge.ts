@@ -20,6 +20,8 @@ import {
 type Operation = "connecting" | "reading" | "applying" | "saving" | "reconnecting" | null;
 type SaveState = "idle" | "dirty" | "applied" | "saved";
 type UsbEffectiveConfig = Pick<ConfigBody, "pollingRateMode" | "controllerMode">;
+const BATTERY_REFRESH_INTERVAL_MS = 15_000;
+const BATTERY_LISTEN_TIMEOUT_MS = 1_200;
 
 export interface UseDs5BridgeResult {
   supported: boolean;
@@ -83,6 +85,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const savedStatusTimerRef = useRef<number | null>(null);
   const expectedUsbDisconnectRef = useRef(false);
   const requireManualSelectionRef = useRef(false);
+  const authorizedDeviceInfoScanIdRef = useRef(0);
 
   const issues = useMemo(() => validateConfig(draft), [draft]);
   const isConnected = Boolean(client?.device.opened);
@@ -129,6 +132,9 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   }, [supported]);
 
   const scanAuthorizedDeviceInfo = useCallback(async (devices: HIDDevice[]) => {
+    const scanId = authorizedDeviceInfoScanIdRef.current + 1;
+    authorizedDeviceInfoScanIdRef.current = scanId;
+
     const entries = await Promise.all(
       devices.map(async (device) => {
         if (clientRef.current?.device === device) {
@@ -149,6 +155,10 @@ export function useDs5Bridge(): UseDs5BridgeResult {
         }
       }),
     );
+
+    if (authorizedDeviceInfoScanIdRef.current !== scanId) {
+      return;
+    }
 
     setAuthorizedDeviceBatteryText(Object.fromEntries(entries.map(([key, value]) => [key, value.batteryText])));
     setAuthorizedDeviceSerialNumber(Object.fromEntries(entries.map(([key, value]) => [key, value.serialNumber])));
@@ -203,6 +213,11 @@ export function useDs5Bridge(): UseDs5BridgeResult {
         setDeviceSerialNumber((await nextClient.readSerialNumber()) || "--");
       } catch {
         setDeviceSerialNumber("--");
+      }
+
+      const nextBatteryText = await listenForBatteryText(nextClient.device, BATTERY_LISTEN_TIMEOUT_MS);
+      if (nextBatteryText) {
+        setBatteryText(nextBatteryText);
       }
     },
     [readConfigWithClient],
@@ -437,6 +452,28 @@ export function useDs5Bridge(): UseDs5BridgeResult {
 
     void scanAuthorizedDeviceInfo(authorizedDevices);
   }, [authorizedDevices, scanAuthorizedDeviceInfo]);
+
+  useEffect(() => {
+    if (!supported) {
+      return;
+    }
+
+    const refreshBatteryInfo = () => {
+      void refreshAuthorizedDevices();
+
+      const connectedDevice = clientRef.current?.device;
+      if (connectedDevice?.opened) {
+        void listenForBatteryText(connectedDevice, BATTERY_LISTEN_TIMEOUT_MS).then((nextBatteryText) => {
+          if (nextBatteryText && clientRef.current?.device === connectedDevice) {
+            setBatteryText(nextBatteryText);
+          }
+        });
+      }
+    };
+
+    const intervalId = window.setInterval(refreshBatteryInfo, BATTERY_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [refreshAuthorizedDevices, supported]);
 
   useEffect(() => {
     return () => {

@@ -49,17 +49,28 @@ export const CONTROLLER_MODE_OPTIONS: Array<{
 
 export function decodeConfigBody(source: ArrayBuffer | DataView | Uint8Array): ConfigBody {
   const bytes = toUint8Array(source);
-  const candidates = bytes.byteLength >= CONFIG_BODY_SIZE + 1 ? [0, 1] : [0];
-  const parsed = candidates.map((offset) => decodeAt(bytes, offset)).filter(Boolean) as ConfigBody[];
-  const valid = parsed.find((config) => validateConfig(config).length === 0);
+  const candidates = configBodyOffsets(bytes.byteLength);
+  const parsed = candidates
+    .map((offset) => {
+      const config = decodeAt(bytes, offset);
+      return config ? { offset, config, issues: validateConfig(config) } : null;
+    })
+    .filter(Boolean) as Array<{ offset: number; config: ConfigBody; issues: ConfigValidationIssue[] }>;
+  const valid = parsed.find((candidate) => candidate.issues.length === 0);
 
   if (valid) {
-    return valid;
+    return valid.config;
   }
 
   if (parsed[0]) {
     throw new ConfigDecodeError("invalidConfig", {
-      issues: validateConfig(parsed[0]).map((issue) => issue.field),
+      issues: parsed[0].issues.map((issue) => issue.field),
+      offset: parsed[0].offset,
+      candidates: parsed.map(({ offset, issues }) => ({
+        offset,
+        issues: issues.map((issue) => issue.field),
+      })),
+      rawHex: bytesToHex(bytes),
     });
   }
 
@@ -189,6 +200,23 @@ function decodeAt(bytes: Uint8Array, offset: number): ConfigBody | null {
   };
 }
 
+function configBodyOffsets(byteLength: number): number[] {
+  if (byteLength < CONFIG_BODY_SIZE) {
+    return [];
+  }
+
+  const offsets = new Set<number>([0]);
+  if (byteLength >= CONFIG_BODY_SIZE + 1) {
+    offsets.add(1);
+  }
+
+  for (let offset = 2; offset <= byteLength - CONFIG_BODY_SIZE; offset += 1) {
+    offsets.add(offset);
+  }
+
+  return [...offsets];
+}
+
 function toUint8Array(source: ArrayBuffer | DataView | Uint8Array): Uint8Array {
   if (source instanceof Uint8Array) {
     return source;
@@ -211,4 +239,8 @@ function clampInteger(value: number, min: number, max: number): number {
 
 function clampToStep(value: number, min: number, max: number, step: number): number {
   return Math.min(max, Math.max(min, roundToStep(value, step)));
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
 }

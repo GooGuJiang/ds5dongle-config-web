@@ -16,7 +16,7 @@ export function PollingRateControl({ value, onChange }: PollingRateControlProps)
   };
 
   return (
-    <div className="control-row">
+    <div className="control-row control-row-plain">
       <strong>{t("config.pollingRateMode")}</strong>
       <Tabs
         value={String(value)}
