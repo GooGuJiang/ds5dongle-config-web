@@ -16,6 +16,7 @@ import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
 import { FirmwareUpdateDialog } from "./components/FirmwareUpdateDialog";
 import { NoticeList } from "./components/NoticeList";
+import { PwaUpdateDialog } from "./components/PwaUpdateDialog";
 import { SidebarDeviceCard } from "./components/SidebarDeviceCard";
 import {
   Sidebar,
@@ -32,6 +33,8 @@ import {
 import { useDs5Bridge } from "./hooks/useDs5Bridge";
 import { useTheme } from "./hooks/useTheme";
 import { checkFirmwareUpdate, shouldCheckFirmwareUpdate, type FirmwareUpdateCheckResult } from "./lib/firmwareRelease";
+import { checkPwaUpdate, type PwaUpdateCheckResult } from "./lib/pwaRelease";
+import { applyPwaUpdate } from "./pwa";
 
 export default function App() {
   const bridge = useDs5Bridge();
@@ -41,6 +44,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [firmwareUpdateResult, setFirmwareUpdateResult] = useState<FirmwareUpdateCheckResult | null>(null);
   const [firmwareUpdateDialogOpen, setFirmwareUpdateDialogOpen] = useState(false);
+  const [pwaUpdateResult, setPwaUpdateResult] = useState<PwaUpdateCheckResult | null>(null);
+  const [pwaUpdateDialogOpen, setPwaUpdateDialogOpen] = useState(false);
+  const [pwaUpdating, setPwaUpdating] = useState(false);
   const isBusy = bridge.operation !== null;
   // 进度条完成后切换回主页（仅在模式切换场景下触发）
   const handleProgressComplete = useCallback(() => {
@@ -91,6 +97,32 @@ export default function App() {
   }, [bridge.client, bridge.firmwareVersion, view]);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
+    void checkPwaUpdate(abortController.signal)
+      .then((result) => {
+        if (!result?.updateAvailable || abortController.signal.aborted) {
+          return;
+        }
+
+        setPwaUpdateResult(result);
+        setPwaUpdateDialogOpen(true);
+      })
+      .catch((error) => {
+        if (!abortController.signal.aborted) {
+          console.error("PWA update check failed", error);
+        }
+      });
+
+    return () => abortController.abort();
+  }, []);
+
+  const handlePwaUpdate = useCallback(() => {
+    setPwaUpdating(true);
+    void applyPwaUpdate().finally(() => setPwaUpdating(false));
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia(SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY);
     const syncSidebarState = () => setSidebarOpen(!mediaQuery.matches);
 
@@ -110,6 +142,13 @@ export default function App() {
         open={firmwareUpdateDialogOpen}
         result={firmwareUpdateResult}
         onOpenChange={setFirmwareUpdateDialogOpen}
+      />
+      <PwaUpdateDialog
+        open={pwaUpdateDialogOpen}
+        result={pwaUpdateResult}
+        updating={pwaUpdating}
+        onOpenChange={setPwaUpdateDialogOpen}
+        onUpdate={handlePwaUpdate}
       />
         <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""}`}>
         <AppHeader

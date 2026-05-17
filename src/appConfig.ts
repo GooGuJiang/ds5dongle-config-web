@@ -9,6 +9,7 @@ export const APP_METADATA = {
   githubRepo: "awalol/DS5Dongle",
   githubUrl: "https://github.com/awalol/DS5Dongle",
   firmwareUpdateApiUrl: "https://ds5-update.g0v0.top/api/firmware/update",
+  pwaUpdateApiUrl: "https://ds5-update.g0v0.top/api/pwa/update",
 } as const;
 
 export const APP_TOAST_OPTIONS = {

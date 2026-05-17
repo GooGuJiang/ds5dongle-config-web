@@ -32,8 +32,21 @@ export const en = {
   },
   pwa: {
     offlineReady: "This page has been saved locally and can be opened offline.",
-    cacheRefresh: "A new version is available. Updating the page content.",
+    cacheRefresh: "Updating the page content.",
     updateFailed: "Failed to update. Please refresh the page manually.",
+  },
+  pwaUpdate: {
+    title: "New web version available",
+    description: "Current web version is {{current}}. The latest release is {{latest}}.",
+    currentVersion: "Current version",
+    latestVersion: "Latest release",
+    latestCommit: "Latest commit",
+    releaseNotes: "Release notes",
+    highlights: "Highlights",
+    later: "Later",
+    updateNow: "Update now",
+    updating: "Updating",
+    openRelease: "Open release",
   },
   firmwareUpdate: {
     title: "New Pico firmware available",

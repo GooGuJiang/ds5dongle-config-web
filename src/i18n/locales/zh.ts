@@ -32,8 +32,21 @@ export const zh = {
   },
   pwa: {
     offlineReady: "页面已保存到本机，离线也可以打开",
-    cacheRefresh: "发现新版本，正在更新页面内容",
+    cacheRefresh: "正在更新页面内容",
     updateFailed: "更新失败，请手动刷新页面",
+  },
+  pwaUpdate: {
+    title: "发现新的网页版本",
+    description: "当前网页版本为 {{current}}，最新版本为 {{latest}}。",
+    currentVersion: "当前版本",
+    latestVersion: "最新版本",
+    latestCommit: "最新提交",
+    releaseNotes: "更新说明",
+    highlights: "更新要点",
+    later: "稍后再说",
+    updateNow: "立即更新",
+    updating: "正在更新",
+    openRelease: "打开发布页",
   },
   firmwareUpdate: {
     title: "发现新的 Pico 固件",

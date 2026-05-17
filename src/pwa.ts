@@ -31,6 +31,7 @@ if (typeof window !== "undefined") {
 
 let hasControllerChangeListener = false;
 let updateServiceWorker: ((reloadPage?: boolean) => Promise<void>) | undefined;
+let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
 
 function setupControllerChangeReload() {
   if (!isBrowser() || hasControllerChangeListener) {
@@ -60,6 +61,8 @@ updateServiceWorker = registerSW({
       return;
     }
 
+    serviceWorkerRegistration = registration;
+
     const checkForUpdate = () => {
       if (navigator.onLine) {
         void registration.update();
@@ -72,28 +75,33 @@ updateServiceWorker = registerSW({
   },
 
   async onNeedRefresh() {
-    toast.loading(t("pwa.cacheRefresh"), {
-      id: "pwa-cache-refresh",
-    });
-
-    try {
-      // 触发 waiting service worker skipWaiting
-      await updateServiceWorker?.(true);
-
-      // 某些环境 controllerchange 不稳定，兜底刷新
-      window.setTimeout(() => {
-        reloadOnce();
-      }, 1500);
-    } catch (error) {
-      console.error("PWA update failed", error);
-
-      toast.error(t("pwa.updateFailed"), {
-        id: "pwa-cache-refresh",
-      });
-    }
+    toast(t("pwa.cacheRefresh"), { id: "pwa-cache-refresh" });
   },
 
   onRegisterError(error) {
     console.error("PWA service worker registration failed", error);
   },
 });
+
+export async function applyPwaUpdate(): Promise<void> {
+  toast.loading(t("pwa.cacheRefresh"), {
+    id: "pwa-cache-refresh",
+  });
+
+  try {
+    await serviceWorkerRegistration?.update();
+    await updateServiceWorker?.(true);
+
+    window.setTimeout(() => {
+      reloadOnce();
+    }, 1500);
+  } catch (error) {
+    console.error("PWA update failed", error);
+
+    toast.error(t("pwa.updateFailed"), {
+      id: "pwa-cache-refresh",
+    });
+
+    throw error;
+  }
+}

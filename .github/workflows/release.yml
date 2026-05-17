@@ -71,15 +71,28 @@ jobs:
           {
             echo "## ${RANGE_TITLE}"
             echo
-            git log "${RANGE}" --pretty=format:'- %s (%h)' --no-merges
-            echo
-          } > RELEASE_NOTES.md
+            HAS_COMMITS=false
 
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "## Recent changes" > RELEASE_NOTES.md
-            echo >> RELEASE_NOTES.md
-            echo "- Release v${{ steps.package.outputs.version }}" >> RELEASE_NOTES.md
-          fi
+            while IFS= read -r COMMIT_HASH; do
+              HAS_COMMITS=true
+              SHORT_HASH="$(git rev-parse --short "${COMMIT_HASH}")"
+              SUBJECT="$(git log -1 --format=%s "${COMMIT_HASH}")"
+              BODY="$(git log -1 --format=%b "${COMMIT_HASH}")"
+
+              echo "### ${SUBJECT} (${SHORT_HASH})"
+              echo
+
+              if [ -n "${BODY}" ]; then
+                echo "${BODY}"
+                echo
+              fi
+            done < <(git log "${RANGE}" --format=%H --no-merges)
+
+            if [ "${HAS_COMMITS}" = false ]; then
+              echo "- Release v${{ steps.package.outputs.version }}"
+              echo
+            fi
+          } > RELEASE_NOTES.md
 
       - name: Create and push version tag
         if: steps.tag.outputs.exists == 'false'

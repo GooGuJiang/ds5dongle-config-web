@@ -31,7 +31,6 @@ export interface FirmwareUpdateCheckResult {
 export interface FirmwareLocalizedNotes {
   zh_CN: FirmwareLocalizedBlock;
   en_US: FirmwareLocalizedBlock;
-  aiGenerated: boolean;
 }
 
 export interface FirmwareLocalizedBlock {
