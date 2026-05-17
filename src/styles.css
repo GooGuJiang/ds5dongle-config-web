@@ -1284,14 +1284,15 @@ h2 {
 [data-slot="sidebar"][data-state="collapsed"] .settings-sidebar [data-sidebar="menu-button"][data-active="true"] {
   color: var(--foreground) !important;
   background: var(--settings-sidebar-active-collapsed) !important;
-  box-shadow: 0 0 0 0.5rem var(--settings-sidebar-active-collapsed) !important;
+  box-shadow: 0 0 0 0.75rem var(--settings-sidebar-active-collapsed) !important;
+  clip-path: inset(-0.75rem round calc(var(--nav-item-radius, 0.5rem) + 0.75rem));
   outline: none !important;
 }
 
 [data-slot="sidebar"][data-state="collapsed"] .settings-sidebar [data-sidebar="menu-button"][data-active="true"]:hover,
 [data-slot="sidebar"][data-state="collapsed"] .settings-sidebar [data-sidebar="menu-button"][data-active="true"]:focus-visible {
   background: var(--settings-sidebar-active-collapsed-hover) !important;
-  box-shadow: 0 0 0 0.5rem var(--settings-sidebar-active-collapsed-hover) !important;
+  box-shadow: 0 0 0 0.75rem var(--settings-sidebar-active-collapsed-hover) !important;
 }
 
 [data-slot="sidebar"][data-state="collapsed"] .settings-sidebar [data-sidebar="menu-button"]:hover,
