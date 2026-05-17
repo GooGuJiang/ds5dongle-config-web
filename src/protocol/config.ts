@@ -1,10 +1,12 @@
-export const CONFIG_BODY_SIZE = 14;
+export const CONFIG_BODY_SIZE = 15;
 export const FEATURE_REPORT_PAYLOAD_SIZE = 63;
+export const CONFIG_VERSION = 1;
 
 export type PollingRateMode = 0 | 1 | 2;
 export type ControllerMode = 0 | 1 | 2;
 
 export interface ConfigBody {
+  configVersion: number;
   hapticsGain: number;
   speakerVolume: number;
   inactiveTime: number;
@@ -20,6 +22,7 @@ export interface ConfigValidationIssue {
 }
 
 export const DEFAULT_CONFIG: ConfigBody = {
+  configVersion: CONFIG_VERSION,
   hapticsGain: 1,
   speakerVolume: 0,
   inactiveTime: 10,
@@ -90,19 +93,24 @@ export function encodeConfigBody(config: ConfigBody): Uint8Array<ArrayBuffer> {
 
   const bytes = new Uint8Array(new ArrayBuffer(CONFIG_BODY_SIZE));
   const view = new DataView(bytes.buffer);
-  view.setFloat32(0, config.hapticsGain, true);
-  view.setFloat32(4, config.speakerVolume, true);
-  view.setUint8(8, config.inactiveTime);
-  view.setUint8(9, config.disableInactiveDisconnect ? 1 : 0);
-  view.setUint8(10, config.disablePicoLed ? 1 : 0);
-  view.setUint8(11, config.pollingRateMode);
-  view.setUint8(12, config.hapticsBufferLength);
-  view.setUint8(13, config.controllerMode);
+  view.setUint8(0, config.configVersion);
+  view.setFloat32(1, config.hapticsGain, true);
+  view.setFloat32(5, config.speakerVolume, true);
+  view.setUint8(9, config.inactiveTime);
+  view.setUint8(10, config.disableInactiveDisconnect ? 1 : 0);
+  view.setUint8(11, config.disablePicoLed ? 1 : 0);
+  view.setUint8(12, config.pollingRateMode);
+  view.setUint8(13, config.hapticsBufferLength);
+  view.setUint8(14, config.controllerMode);
   return bytes;
 }
 
 export function validateConfig(config: ConfigBody): ConfigValidationIssue[] {
   const issues: ConfigValidationIssue[] = [];
+
+  if (!Number.isInteger(config.configVersion) || config.configVersion < 0 || config.configVersion > 255) {
+    issues.push({ field: "configVersion" });
+  }
 
   if (!Number.isFinite(config.hapticsGain) || config.hapticsGain < 1 || config.hapticsGain > 2) {
     issues.push({ field: "hapticsGain" });
@@ -137,6 +145,7 @@ export function validateConfig(config: ConfigBody): ConfigValidationIssue[] {
 
 export function normalizeConfig(config: ConfigBody): ConfigBody {
   return {
+    configVersion: clampInteger(config.configVersion ?? CONFIG_VERSION, 0, 255),
     hapticsGain: roundToStep(config.hapticsGain, 0.01),
     speakerVolume: clampToStep(config.speakerVolume, -100, 0, 0.01),
     inactiveTime: clampInteger(config.inactiveTime, 5, 60),
@@ -154,6 +163,7 @@ export function configsEqual(left: ConfigBody | null, right: ConfigBody | null):
   }
 
   return (
+    left.configVersion === right.configVersion &&
     Math.abs(left.hapticsGain - right.hapticsGain) < 0.001 &&
     Math.abs(left.speakerVolume - right.speakerVolume) < 0.001 &&
     left.inactiveTime === right.inactiveTime &&
@@ -189,14 +199,15 @@ function decodeAt(bytes: Uint8Array, offset: number): ConfigBody | null {
 
   const view = new DataView(bytes.buffer, bytes.byteOffset + offset, CONFIG_BODY_SIZE);
   return {
-    hapticsGain: view.getFloat32(0, true),
-    speakerVolume: view.getFloat32(4, true),
-    inactiveTime: view.getUint8(8),
-    disableInactiveDisconnect: view.getUint8(9) === 1,
-    disablePicoLed: view.getUint8(10) === 1,
-    pollingRateMode: view.getUint8(11) as PollingRateMode,
-    hapticsBufferLength: view.getUint8(12),
-    controllerMode: view.getUint8(13) as ControllerMode,
+    configVersion: view.getUint8(0),
+    hapticsGain: view.getFloat32(1, true),
+    speakerVolume: view.getFloat32(5, true),
+    inactiveTime: view.getUint8(9),
+    disableInactiveDisconnect: view.getUint8(10) === 1,
+    disablePicoLed: view.getUint8(11) === 1,
+    pollingRateMode: view.getUint8(12) as PollingRateMode,
+    hapticsBufferLength: view.getUint8(13),
+    controllerMode: view.getUint8(14) as ControllerMode,
   };
 }
 

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   APP_METADATA,
   APP_TOAST_OPTIONS,
+  SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY,
   SETTINGS_NAV_ITEMS,
   SETTINGS_SIDEBAR_PROVIDER_STYLE,
   type AppView,
@@ -14,6 +15,7 @@ import { AppHeader } from "./components/AppHeader";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
 import { NoticeList } from "./components/NoticeList";
+import { SidebarDeviceCard } from "./components/SidebarDeviceCard";
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +36,7 @@ export default function App() {
   const theme = useTheme();
   const { t } = useTranslation();
   const [view, setView] = useState<AppView>("home");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const isBusy = bridge.operation !== null;
   // 进度条完成后切换回主页（仅在模式切换场景下触发）
   const handleProgressComplete = useCallback(() => {
@@ -57,6 +60,16 @@ export default function App() {
     toast.error(bridge.error, { id: "bridge-error" });
     bridge.clearError();
   }, [bridge.error, bridge.clearError]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY);
+    const syncSidebarState = () => setSidebarOpen(!mediaQuery.matches);
+
+    syncSidebarState();
+    mediaQuery.addEventListener("change", syncSidebarState);
+
+    return () => mediaQuery.removeEventListener("change", syncSidebarState);
+  }, []);
 
   return (
     <>
@@ -88,8 +101,12 @@ export default function App() {
                 authorizedDevices={bridge.authorizedDevices}
                 authorizedDeviceSerialNumber={bridge.authorizedDeviceSerialNumber}
                 authorizedDeviceBatteryText={bridge.authorizedDeviceBatteryText}
+                authorizedDeviceFirmwareVersion={bridge.authorizedDeviceFirmwareVersion}
+                authorizedDeviceSignalStrength={bridge.authorizedDeviceSignalStrength}
                 client={bridge.client}
                 batteryText={bridge.batteryText}
+                firmwareVersion={bridge.firmwareVersion}
+                signalStrength={bridge.signalStrength}
                 deviceSerialNumber={bridge.deviceSerialNumber}
                 deviceLabel={bridge.deviceLabel}
                 isBusy={isBusy}
@@ -104,9 +121,21 @@ export default function App() {
             </span>
           </>
         ) : (
-          <SidebarProvider className="settings-page" style={SETTINGS_SIDEBAR_PROVIDER_STYLE}>
+          <SidebarProvider className="settings-page" style={SETTINGS_SIDEBAR_PROVIDER_STYLE} open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <Sidebar className="settings-sidebar" collapsible="icon" aria-label={t("settings.navigation")}>
               <SidebarContent className="settings-sidebar-content">
+                <SidebarDeviceCard
+                  authorizedDevices={bridge.authorizedDevices}
+                  authorizedDeviceBatteryText={bridge.authorizedDeviceBatteryText}
+                  authorizedDeviceFirmwareVersion={bridge.authorizedDeviceFirmwareVersion}
+                  authorizedDeviceSignalStrength={bridge.authorizedDeviceSignalStrength}
+                  connectedDevice={bridge.client?.device ?? null}
+                  deviceLabel={bridge.deviceLabel}
+                  batteryText={bridge.batteryText}
+                  firmwareVersion={bridge.firmwareVersion}
+                  signalStrength={bridge.signalStrength}
+                  onSelectDevice={bridge.connectAuthorized}
+                />
                 <SidebarGroup>
                   <SidebarGroupContent>
                     <SidebarMenu>

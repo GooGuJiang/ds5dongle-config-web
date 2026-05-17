@@ -28,8 +28,11 @@ export const APP_TOAST_OPTIONS = {
 } as const;
 
 export const SETTINGS_SIDEBAR_PROVIDER_STYLE = {
-  "--sidebar-width": "248px",
+  "--sidebar-width": "300px",
+  "--sidebar-width-icon": "80px",
 } as CSSProperties;
+
+export const SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1120px)";
 
 export const SETTINGS_NAV_ITEMS = [
   { icon: Settings, labelKey: "settings.nav.settings", view: "settings" },

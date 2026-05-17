@@ -13,6 +13,8 @@ export const WEBHID_UNAVAILABLE_ERROR = "webHidUnavailable";
 
 const REPORT_SET_CONFIG = 0xf6;
 const REPORT_GET_CONFIG = 0xf7;
+const REPORT_GET_FIRMWARE_VERSION = 0xf8;
+const REPORT_GET_SIGNAL_STRENGTH = 0xf9;
 const REPORT_COMMAND = 0x80;
 const REPORT_RESULT = 0x81;
 const CMD_UPDATE_CONFIG = 0x01;
@@ -89,6 +91,21 @@ export class Ds5BridgeHidClient {
     const report = commandReport(CMD_UPDATE_CONFIG);
     report.set(body, 1);
     await this.device.sendFeatureReport(REPORT_SET_CONFIG, report);
+  }
+
+  async readFirmwareVersion(): Promise<string> {
+    await this.open();
+    const report = await this.device.receiveFeatureReport(REPORT_GET_FIRMWARE_VERSION);
+    debugFeatureReport("readFirmwareVersion receive", REPORT_GET_FIRMWARE_VERSION, report);
+    return decodeNullTerminatedText(featureReportPayload(report, REPORT_GET_FIRMWARE_VERSION)) || "--";
+  }
+
+  async readSignalStrength(): Promise<number | null> {
+    await this.open();
+    const report = await this.device.receiveFeatureReport(REPORT_GET_SIGNAL_STRENGTH);
+    debugFeatureReport("readSignalStrength receive", REPORT_GET_SIGNAL_STRENGTH, report);
+    const payload = featureReportPayload(report, REPORT_GET_SIGNAL_STRENGTH);
+    return payload.byteLength > 0 ? payload.getInt8(0) : null;
   }
 
   async saveToFlash(): Promise<void> {
@@ -176,8 +193,20 @@ function isSerialNumberResult(report: DataView): boolean {
   );
 }
 
+function featureReportPayload(report: DataView, reportId: number): DataView {
+  if (report.byteLength > 0 && report.getUint8(0) === reportId) {
+    return new DataView(report.buffer, report.byteOffset + 1, report.byteLength - 1);
+  }
+
+  return report;
+}
+
 function decodeSerialNumber(data: DataView): string {
   return new TextDecoder("shift_jis").decode(data).replace(/\0/g, "").trim();
+}
+
+function decodeNullTerminatedText(data: DataView): string {
+  return new TextDecoder().decode(data).replace(/\0/g, "").trim();
 }
 
 function sleep(ms: number): Promise<void> {

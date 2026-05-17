@@ -21,6 +21,7 @@ type Operation = "connecting" | "reading" | "applying" | "saving" | "reconnectin
 type SaveState = "idle" | "dirty" | "applied" | "saved";
 type UsbEffectiveConfig = Pick<ConfigBody, "pollingRateMode" | "controllerMode">;
 const BATTERY_REFRESH_INTERVAL_MS = 15_000;
+const PICO_INFO_REFRESH_INTERVAL_MS = 5_000;
 const BATTERY_LISTEN_TIMEOUT_MS = 1_200;
 
 export interface UseDs5BridgeResult {
@@ -29,8 +30,12 @@ export interface UseDs5BridgeResult {
   deviceLabel: string;
   deviceSerialNumber: string;
   batteryText: string;
+  firmwareVersion: string;
+  signalStrength: string;
   authorizedDeviceSerialNumber: Record<string, string>;
   authorizedDeviceBatteryText: Record<string, string>;
+  authorizedDeviceFirmwareVersion: Record<string, string>;
+  authorizedDeviceSignalStrength: Record<string, string>;
   authorizedDevices: HIDDevice[];
   config: ConfigBody | null;
   draft: ConfigBody;
@@ -71,9 +76,13 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const [shouldReturnHome, setShouldReturnHome] = useState(false);
   const shouldReturnHomeRef = useRef(false);
   const [batteryText, setBatteryText] = useState("--");
+  const [firmwareVersion, setFirmwareVersion] = useState("--");
+  const [signalStrength, setSignalStrength] = useState("--");
   const [deviceSerialNumber, setDeviceSerialNumber] = useState("--");
   const [authorizedDeviceSerialNumber, setAuthorizedDeviceSerialNumber] = useState<Record<string, string>>({});
   const [authorizedDeviceBatteryText, setAuthorizedDeviceBatteryText] = useState<Record<string, string>>({});
+  const [authorizedDeviceFirmwareVersion, setAuthorizedDeviceFirmwareVersion] = useState<Record<string, string>>({});
+  const [authorizedDeviceSignalStrength, setAuthorizedDeviceSignalStrength] = useState<Record<string, string>>({});
   const [settledStatusText, setSettledStatusText] = useState(t("status.ready"));
   const clientRef = useRef<Ds5BridgeHidClient | null>(null);
   const configRef = useRef<ConfigBody | null>(null);
@@ -86,6 +95,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const expectedUsbDisconnectRef = useRef(false);
   const requireManualSelectionRef = useRef(false);
   const authorizedDeviceInfoScanIdRef = useRef(0);
+  const pendingChangedFieldsRef = useRef<Set<keyof ConfigBody>>(new Set());
 
   const issues = useMemo(() => validateConfig(draft), [draft]);
   const isConnected = Boolean(client?.device.opened);
@@ -138,20 +148,30 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     const entries = await Promise.all(
       devices.map(async (device) => {
         if (clientRef.current?.device === device) {
-          return [deviceKey(device), { batteryText, serialNumber: deviceSerialNumber }] as const;
+          return [deviceKey(device), { batteryText, serialNumber: deviceSerialNumber, firmwareVersion, signalStrength }] as const;
         }
 
         const nextClient = new Ds5BridgeHidClient(device);
         try {
           await nextClient.open();
-          const [nextBatteryText, nextSerialNumber] = await Promise.all([
+          const [nextBatteryText, nextSerialNumber, nextFirmwareVersion, nextSignalStrength] = await Promise.all([
             listenForBatteryText(device, 900),
             nextClient.readSerialNumber().catch(() => "--"),
+            nextClient.readFirmwareVersion().catch(() => "--"),
+            nextClient.readSignalStrength().then(formatSignalStrength).catch(() => "--"),
           ]);
           await nextClient.close();
-          return [deviceKey(device), { batteryText: nextBatteryText ?? "--", serialNumber: nextSerialNumber || "--" }] as const;
+          return [
+            deviceKey(device),
+            {
+              batteryText: nextBatteryText ?? "--",
+              serialNumber: nextSerialNumber || "--",
+              firmwareVersion: nextFirmwareVersion || "--",
+              signalStrength: nextSignalStrength,
+            },
+          ] as const;
         } catch {
-          return [deviceKey(device), { batteryText: "--", serialNumber: "--" }] as const;
+          return [deviceKey(device), { batteryText: "--", serialNumber: "--", firmwareVersion: "--", signalStrength: "--" }] as const;
         }
       }),
     );
@@ -162,7 +182,9 @@ export function useDs5Bridge(): UseDs5BridgeResult {
 
     setAuthorizedDeviceBatteryText(Object.fromEntries(entries.map(([key, value]) => [key, value.batteryText])));
     setAuthorizedDeviceSerialNumber(Object.fromEntries(entries.map(([key, value]) => [key, value.serialNumber])));
-  }, [batteryText, deviceSerialNumber]);
+    setAuthorizedDeviceFirmwareVersion(Object.fromEntries(entries.map(([key, value]) => [key, value.firmwareVersion])));
+    setAuthorizedDeviceSignalStrength(Object.fromEntries(entries.map(([key, value]) => [key, value.signalStrength])));
+  }, [batteryText, deviceSerialNumber, firmwareVersion, signalStrength]);
 
   const readConfigWithClient = useCallback(async (nextClient: Ds5BridgeHidClient, syncUsbEffectiveConfig = false) => {
     setOperation("reading");
@@ -194,6 +216,8 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     setNeedsUsbReconnect(false);
     setSaveState("idle");
     setBatteryText("--");
+    setFirmwareVersion("--");
+    setSignalStrength("--");
     setDeviceSerialNumber("--");
   }, []);
 
@@ -219,6 +243,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       if (nextBatteryText) {
         setBatteryText(nextBatteryText);
       }
+      await refreshPicoInfo(nextClient, setFirmwareVersion, setSignalStrength);
     },
     [readConfigWithClient],
   );
@@ -281,12 +306,14 @@ export function useDs5Bridge(): UseDs5BridgeResult {
           break;
         }
 
-        const nextDraft = normalizeConfig(draftRef.current);
+        const nextDraft = normalizeConfig(preservePollingRateForControllerOnlyChange(draftRef.current, pendingChangedFieldsRef.current, configRef.current));
         if (validateConfig(nextDraft).length > 0 || configsEqual(configRef.current, nextDraft)) {
+          pendingChangedFieldsRef.current.clear();
           break;
         }
 
         await nextClient.applyConfig(nextDraft);
+        pendingChangedFieldsRef.current.clear();
         configRef.current = nextDraft;
         setConfig(nextDraft);
         const currentUsbEffectiveConfig = usbEffectiveConfigRef.current;
@@ -397,6 +424,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const setDraftField = useCallback(
     <Key extends keyof ConfigBody>(field: Key, value: ConfigBody[Key]) => {
       const nextDraft = { ...draftRef.current, [field]: value };
+      pendingChangedFieldsRef.current.add(field);
       draftRef.current = nextDraft;
       setDraft(nextDraft);
       setSaveState("dirty");
@@ -412,6 +440,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     }
 
     draftRef.current = DEFAULT_CONFIG;
+    pendingChangedFieldsRef.current = new Set(Object.keys(DEFAULT_CONFIG) as Array<keyof ConfigBody>);
     setDraft(DEFAULT_CONFIG);
     setSaveState("dirty");
 
@@ -444,9 +473,11 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   }, [refreshAuthorizedDevices]);
 
   useEffect(() => {
-    if (authorizedDevices.length === 0) {
+      if (authorizedDevices.length === 0) {
       setAuthorizedDeviceBatteryText({});
       setAuthorizedDeviceSerialNumber({});
+      setAuthorizedDeviceFirmwareVersion({});
+      setAuthorizedDeviceSignalStrength({});
       return;
     }
 
@@ -474,6 +505,23 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     const intervalId = window.setInterval(refreshBatteryInfo, BATTERY_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [refreshAuthorizedDevices, supported]);
+
+  useEffect(() => {
+    if (!supported) {
+      return;
+    }
+
+    const refreshConnectedPicoInfo = () => {
+      const currentClient = clientRef.current;
+      if (currentClient?.device.opened) {
+        void refreshPicoInfo(currentClient, setFirmwareVersion, setSignalStrength);
+      }
+    };
+
+    refreshConnectedPicoInfo();
+    const intervalId = window.setInterval(refreshConnectedPicoInfo, PICO_INFO_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [supported]);
 
   useEffect(() => {
     return () => {
@@ -548,8 +596,12 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     deviceLabel,
     deviceSerialNumber,
     batteryText,
+    firmwareVersion,
+    signalStrength,
     authorizedDeviceSerialNumber,
     authorizedDeviceBatteryText,
+    authorizedDeviceFirmwareVersion,
+    authorizedDeviceSignalStrength,
     authorizedDevices,
     config,
     draft,
@@ -610,6 +662,24 @@ function listenForBatteryText(device: HIDDevice, timeoutMs: number): Promise<str
   });
 }
 
+async function refreshPicoInfo(
+  client: Ds5BridgeHidClient,
+  setFirmwareVersion: (value: string) => void,
+  setSignalStrength: (value: string) => void,
+): Promise<void> {
+  const [nextFirmwareVersion, nextSignalStrength] = await Promise.all([
+    client.readFirmwareVersion().catch(() => "--"),
+    client.readSignalStrength().then(formatSignalStrength).catch(() => "--"),
+  ]);
+
+  setFirmwareVersion(nextFirmwareVersion || "--");
+  setSignalStrength(nextSignalStrength);
+}
+
+function formatSignalStrength(rssi: number | null): string {
+  return typeof rssi === "number" ? `${rssi} dBm` : "--";
+}
+
 function parseDualSenseBatteryText(data: DataView, reportId: number): string | null {
   const status0Offset = reportId === 0x31 ? 53 : 52;
   if (data.byteLength <= status0Offset) {
@@ -654,6 +724,25 @@ function pickUsbEffectiveConfig(config: ConfigBody): UsbEffectiveConfig {
   return {
     pollingRateMode: config.pollingRateMode,
     controllerMode: config.controllerMode,
+  };
+}
+
+function preservePollingRateForControllerOnlyChange(
+  draft: ConfigBody,
+  pendingChangedFields: Set<keyof ConfigBody>,
+  currentConfig: ConfigBody | null,
+): ConfigBody {
+  if (
+    !currentConfig ||
+    !pendingChangedFields.has("controllerMode") ||
+    pendingChangedFields.has("pollingRateMode")
+  ) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    pollingRateMode: currentConfig.pollingRateMode,
   };
 }
 

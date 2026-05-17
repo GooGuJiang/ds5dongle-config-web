@@ -1,5 +1,5 @@
-import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { Eye, EyeOff, Plus } from "lucide-react";
+import { type KeyboardEvent } from "react";
+import { CircleAlert, Plus, Radio } from "lucide-react";
 import {
   MdBattery0Bar,
   MdBattery1Bar,
@@ -15,14 +15,16 @@ import { Tooltip } from "react-tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const SERIAL_VISIBILITY_STORAGE_KEY = "ds5dongle:showSerialNumber";
-
 interface DeviceStripProps {
   authorizedDevices: HIDDevice[];
   authorizedDeviceSerialNumber: Record<string, string>;
   authorizedDeviceBatteryText: Record<string, string>;
+  authorizedDeviceFirmwareVersion: Record<string, string>;
+  authorizedDeviceSignalStrength: Record<string, string>;
   client: unknown | null;
   batteryText: string;
+  firmwareVersion: string;
+  signalStrength: string;
   deviceSerialNumber: string;
   deviceLabel: string;
   isBusy: boolean;
@@ -36,8 +38,12 @@ export function DeviceStrip({
   authorizedDevices,
   authorizedDeviceSerialNumber,
   authorizedDeviceBatteryText,
+  authorizedDeviceFirmwareVersion,
+  authorizedDeviceSignalStrength,
   client,
   batteryText,
+  firmwareVersion,
+  signalStrength,
   deviceSerialNumber,
   deviceLabel,
   isBusy,
@@ -47,9 +53,8 @@ export function DeviceStrip({
   onOpenSettings,
 }: DeviceStripProps) {
   const { t } = useTranslation();
-  const [showSerialNumber, setShowSerialNumber] = useState(() => readStoredSerialVisibility());
   const connectedDevice = client
-    ? [{ key: deviceLabel, label: deviceLabel, batteryText, serialNumber: deviceSerialNumber, connected: true, device: null }]
+    ? [{ key: deviceLabel, label: deviceLabel, batteryText, firmwareVersion, signalStrength, serialNumber: deviceSerialNumber, connected: true, device: null }]
     : [];
   const pairedDevices = client
     ? connectedDevice
@@ -57,19 +62,13 @@ export function DeviceStrip({
         key: `${device.vendorId}:${device.productId}:${device.productName}`,
         label: deviceLabelFromDevice(device),
         batteryText: authorizedDeviceBatteryText[deviceKey(device)] ?? "--",
+        firmwareVersion: authorizedDeviceFirmwareVersion[deviceKey(device)] ?? "--",
+        signalStrength: authorizedDeviceSignalStrength[deviceKey(device)] ?? "--",
         serialNumber: authorizedDeviceSerialNumber[deviceKey(device)] ?? "--",
         connected: false,
         device,
       }));
   const hasPairedDevice = pairedDevices.length > 0;
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(SERIAL_VISIBILITY_STORAGE_KEY, showSerialNumber ? "1" : "0");
-    } catch {
-      // Ignore storage failures, e.g. private mode or disabled localStorage.
-    }
-  }, [showSerialNumber]);
 
   const openSettingsFromCard = () => {
     if (client) {
@@ -102,11 +101,6 @@ export function DeviceStrip({
 
     event.preventDefault();
     void openAuthorizedDevice(device);
-  };
-
-  const toggleSerialVisibility = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    setShowSerialNumber((value) => !value);
   };
 
   return (
@@ -145,26 +139,29 @@ export function DeviceStrip({
                       </strong>
                       {!item.connected && item.serialNumber === "--" && <p>{t("device.selectToConnect")}</p>}
                     </div>
-                    {item.serialNumber !== "--" && (
-                      <div className="device-serial-number">
-                        <span>{t("device.serialNumber", { serialNumber: showSerialNumber ? item.serialNumber : maskSerialNumber(item.serialNumber) })}</span>
-                        <button
-                          type="button"
-                          className="device-serial-visibility"
-                          onClick={toggleSerialVisibility}
-                          aria-label={showSerialNumber ? t("device.hideSerialNumber") : t("device.showSerialNumber")}
-                          data-tooltip-id="device-serial-tooltip"
-                          data-tooltip-content={showSerialNumber ? t("device.hideSerialNumber") : t("device.showSerialNumber")}
-                          data-tooltip-place="top"
-                        >
-                          {showSerialNumber ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    )}
-                    <div className="device-status-icons" aria-hidden="true">
-                      <span className="device-battery" data-battery-level={batteryLevelState(item.batteryText)}>
+                    <div className="device-status-icons">
+                      <span
+                        className="device-meta-icon"
+                        data-tooltip-id="device-info-tooltip"
+                        data-tooltip-content={t("device.firmwareVersion", { version: item.firmwareVersion })}
+                        data-tooltip-place="top"
+                      >
+                        <CircleAlert size={18} />
+                      </span>
+                      <span
+                        className="device-meta-icon"
+                        data-tooltip-id="device-info-tooltip"
+                        data-tooltip-content={t("device.signalStrength", { signal: item.signalStrength })}
+                        data-tooltip-place="top"
+                      >
+                        <Radio size={18} />
+                      </span>
+                      <span
+                        className="device-battery"
+                        data-battery-level={batteryLevelState(item.batteryText)}
+                      >
                         <BatteryIcon batteryText={item.batteryText} />
-                        {item.batteryText}
+                        <span>{item.batteryText}</span>
                       </span>
                     </div>
                   </div>
@@ -200,7 +197,7 @@ export function DeviceStrip({
         </div>
       )}
       {!supported && <p className="device-hint">{t("notice.webHidUnsupported")}</p>}
-      <Tooltip id="device-serial-tooltip" place="top" positionStrategy="fixed" />
+      <Tooltip id="device-info-tooltip" place="top" positionStrategy="fixed" />
     </section>
   );
 }
@@ -212,19 +209,6 @@ function deviceLabelFromDevice(device: HIDDevice): string {
 
 function deviceKey(device: HIDDevice): string {
   return `${device.vendorId}:${device.productId}:${device.productName}`;
-}
-
-function readStoredSerialVisibility(): boolean {
-  try {
-    return window.localStorage.getItem(SERIAL_VISIBILITY_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function maskSerialNumber(serialNumber: string): string {
-  const visiblePrefixLength = Math.min(6, serialNumber.length);
-  return `${serialNumber.slice(0, visiblePrefixLength)}${"*".repeat(serialNumber.length - visiblePrefixLength)}`;
 }
 
 function BatteryIcon({ batteryText }: { batteryText: string }) {
