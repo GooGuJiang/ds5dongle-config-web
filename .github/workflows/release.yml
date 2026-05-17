@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub Release from package version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read package version
+        id: package
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if tag already exists
+        id: tag
+        shell: bash
+        run: |
+          if git rev-parse -q --verify "refs/tags/${{ steps.package.outputs.tag }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.package.outputs.tag }} already exists. Nothing to release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find previous version tag
+        id: previous
+        if: steps.tag.outputs.exists == 'false'
+        shell: bash
+        run: |
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -v '^${{ steps.package.outputs.tag }}$' | head -n 1 || true)"
+          echo "tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes from recent commits
+        id: notes
+        if: steps.tag.outputs.exists == 'false'
+        shell: bash
+        run: |
+          if [ -n "${{ steps.previous.outputs.tag }}" ]; then
+            RANGE="${{ steps.previous.outputs.tag }}..HEAD"
+            RANGE_TITLE="Changes since ${{ steps.previous.outputs.tag }}"
+          else
+            RANGE="HEAD"
+            RANGE_TITLE="Recent changes"
+          fi
+
+          {
+            echo "## ${RANGE_TITLE}"
+            echo
+            git log "${RANGE}" --pretty=format:'- %s (%h)' --no-merges
+            echo
+          } > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "## Recent changes" > RELEASE_NOTES.md
+            echo >> RELEASE_NOTES.md
+            echo "- Release v${{ steps.package.outputs.version }}" >> RELEASE_NOTES.md
+          fi
+
+      - name: Create and push version tag
+        if: steps.tag.outputs.exists == 'false'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.package.outputs.tag }}" -m "Release ${{ steps.package.outputs.tag }}"
+          git push origin "${{ steps.package.outputs.tag }}"
+
+      - name: Create GitHub release
+        if: steps.tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.package.outputs.tag }}
+          name: ${{ steps.package.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
