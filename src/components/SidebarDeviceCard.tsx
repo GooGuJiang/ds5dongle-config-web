@@ -15,6 +15,7 @@ import { BatteryFull, ChevronRight, CircleAlert, CircleArrowUp, LoaderCircle, Ra
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getDeviceKey, getDeviceLabel } from "@/protocol/ds5BridgeHid";
 
 interface SidebarDeviceCardProps {
   authorizedDevices: HIDDevice[];
@@ -54,17 +55,18 @@ export function SidebarDeviceCard({
   const [deviceName] = deviceLabel.split(" · ");
   const isSignalLoading = isLoadingValue(signalStrength);
   const isFirmwareLoading = isLoadingValue(firmwareVersion);
-  const connectedDeviceKey = connectedDevice ? deviceKey(connectedDevice) : null;
-  const visibleDevices = connectedDevice && !authorizedDevices.some((device) => deviceKey(device) === connectedDeviceKey)
+  const connectedDeviceKey = connectedDevice ? getDeviceKey(connectedDevice) : null;
+  const visibleDevices = connectedDevice && !authorizedDevices.some((device) => getDeviceKey(device) === connectedDeviceKey)
     ? [connectedDevice, ...authorizedDevices]
     : authorizedDevices;
   const popoverDevices = visibleDevices.map((device) => {
-    const key = deviceKey(device);
+    const key = getDeviceKey(device);
     const active = key === connectedDeviceKey;
+    const [label] = getDeviceLabel(device).split(" · ");
 
     return {
       key,
-      label: active ? deviceName : deviceLabelFromDevice(device).split(" · ")[0],
+      label: active ? deviceName : label,
       batteryText: active ? batteryText : authorizedDeviceBatteryText[key] ?? "--",
       firmwareVersion: active ? firmwareVersion : authorizedDeviceFirmwareVersion[key] ?? "--",
       signalStrength: active ? signalStrength : authorizedDeviceSignalStrength[key] ?? "--",
@@ -219,21 +221,6 @@ export function SidebarDeviceCard({
       </FloatingPortal>
     </>
   );
-}
-
-function deviceKey(device: HIDDevice): string {
-  const serialNumber = device.serialNumber?.trim();
-
-  if (serialNumber) {
-    return `${device.vendorId}:${device.productId}:${serialNumber}`;
-  }
-
-  return `${device.vendorId}:${device.productId}:${device.productName}`;
-}
-
-function deviceLabelFromDevice(device: HIDDevice): string {
-  const productId = device.productId.toString(16).padStart(4, "0").toUpperCase();
-  return `${device.productName || "DS5 Bridge"} · ${device.vendorId.toString(16).padStart(4, "0").toUpperCase()}:${productId}`;
 }
 
 function isLoadingValue(value: string): boolean {

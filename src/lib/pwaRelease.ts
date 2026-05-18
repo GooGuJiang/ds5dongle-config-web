@@ -3,7 +3,7 @@ import { APP_METADATA } from "../appConfig";
 const UNKNOWN_VERSION = "--";
 const PWA_UPDATE_CACHE_PREFIX = "pwa-update-cache:";
 const PWA_UPDATE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const PWA_UPDATE_TIMEOUT_MS = 4_500;
+const PWA_UPDATE_TIMEOUT_MS = import.meta.env.DEV ? 30_000 : 15_000;
 
 export interface PwaReleaseAsset {
   name: string;

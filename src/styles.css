@@ -295,6 +295,23 @@ button:disabled {
   padding-left: 0;
 }
 
+.app-shell.settings-mode::before {
+  position: fixed;
+  inset: var(--app-header-height) 0 0 0;
+  z-index: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 24% 18%, color-mix(in srgb, var(--primary) 18%, transparent) 0, transparent 34%),
+    linear-gradient(120deg, transparent, color-mix(in srgb, var(--primary) 8%, transparent), transparent);
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+.app-shell.settings-mode.is-device-switching::before {
+  animation: none;
+}
+
 .app-header {
   position: sticky;
   top: 0;
@@ -1017,6 +1034,20 @@ h2 {
   }
 }
 
+@keyframes settings-device-switch-sheen {
+  0% {
+    opacity: 0;
+  }
+
+  40% {
+    opacity: 0.72;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes device-scan-pulse {
   0%,
   100% {
@@ -1043,6 +1074,23 @@ h2 {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes device-switch-background {
+  0% {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  34% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.018);
   }
 }
 
@@ -1498,6 +1546,7 @@ h2 {
 .settings-detail {
   display: grid;
   position: relative;
+  isolation: isolate;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
@@ -1507,6 +1556,22 @@ h2 {
   padding: 1rem 0.5rem 1rem 1rem;
   overflow: clip;
   background: var(--settings-surface);
+}
+
+.settings-detail::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    color-mix(in srgb, var(--background) 72%, transparent);
+  opacity: 0;
+}
+
+.app-shell.settings-mode.is-device-switching .settings-detail::after {
+  animation: settings-device-switch-sheen 420ms ease-out both;
 }
 
 .settings-detail > .panel {
@@ -1537,6 +1602,11 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .settings-view-transition {
     animation: none;
+  }
+
+  .settings-view-transition.is-device-switching {
+    animation: none;
+    pointer-events: auto;
   }
 }
 

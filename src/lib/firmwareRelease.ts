@@ -3,7 +3,7 @@ import { APP_METADATA } from "../appConfig";
 const UNKNOWN_VERSION = "--";
 const FIRMWARE_UPDATE_CACHE_PREFIX = "firmware-update-cache:";
 const FIRMWARE_UPDATE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const FIRMWARE_UPDATE_TIMEOUT_MS = 4_500;
+const FIRMWARE_UPDATE_TIMEOUT_MS = import.meta.env.DEV ? 30_000 : 15_000;
 
 export interface FirmwareReleaseAsset {
   name: string;

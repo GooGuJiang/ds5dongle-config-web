@@ -26,6 +26,8 @@ const SERIAL_NUMBER_SIZE = 32;
 const FEATURE_REPORT_DEFAULT_PAYLOAD_SIZE = FEATURE_REPORT_PAYLOAD_SIZE;
 const FEATURE_REPORT_CHECKSUM_SIZE = 4;
 const FEATURE_REPORT_CHECKSUM_PREFIX = 0x53;
+const deviceSessionKeyByDevice = new WeakMap<HIDDevice, string>();
+let nextDeviceSessionId = 1;
 
 export class Ds5BridgeHidClient {
   constructor(public readonly device: HIDDevice) {}
@@ -154,7 +156,24 @@ export function getDeviceLabel(device: HIDDevice | null): string {
   }
 
   const productId = device.productId.toString(16).padStart(4, "0").toUpperCase();
-  return `${device.productName || "DS5 Bridge"} · 054C:${productId}`;
+  const serialNumber = device.serialNumber?.trim();
+  const descriptorSummary = getDeviceDescriptorSummary(device);
+  return `${device.productName || "DS5 Bridge"} · 054C:${productId}${serialNumber ? ` · ${serialNumber}` : ""}${descriptorSummary ? ` · ${descriptorSummary}` : ""}`;
+}
+
+export function getDeviceKey(device: HIDDevice): string {
+  const cachedKey = deviceSessionKeyByDevice.get(device);
+
+  if (cachedKey) {
+    return cachedKey;
+  }
+
+  const serialNumber = device.serialNumber?.trim();
+  const sessionId = nextDeviceSessionId++;
+  const key = serialNumber ? `serial:${device.vendorId}:${device.productId}:${serialNumber}` : `session:${sessionId}`;
+
+  deviceSessionKeyByDevice.set(device, key);
+  return key;
 }
 
 function getHid(): HID {
@@ -178,6 +197,34 @@ function featureReportPayloadSize(device: HIDDevice, reportId: number): number {
       .find((report) => report.reportId === reportId)
       ?.items?.[0]?.reportCount ?? FEATURE_REPORT_DEFAULT_PAYLOAD_SIZE
   );
+}
+
+function getDeviceDescriptorSummary(device: HIDDevice): string {
+  const featureReportIds = getReportIds(device.collections.flatMap((collection) => collection.featureReports ?? []));
+  return featureReportIds.length > 0 ? `${featureReportIds.length} feature reports` : "";
+}
+
+function getDeviceDescriptorSignature(device: HIDDevice): string {
+  return device.collections
+    .map((collection) => {
+      const inputReports = getReportSignature(collection.inputReports ?? []);
+      const outputReports = getReportSignature(collection.outputReports ?? []);
+      const featureReports = getReportSignature(collection.featureReports ?? []);
+
+      return [collection.usagePage ?? "", collection.usage ?? "", inputReports, outputReports, featureReports].join("/");
+    })
+    .join("|");
+}
+
+function getReportSignature(reports: readonly HIDReportInfo[]): string {
+  return reports
+    .map((report) => `${report.reportId}.${report.items?.length ?? 0}.${report.items?.[0]?.reportCount ?? 0}`)
+    .sort()
+    .join(",");
+}
+
+function getReportIds(reports: readonly HIDReportInfo[]): number[] {
+  return Array.from(new Set(reports.map((report) => report.reportId))).sort((left, right) => left - right);
 }
 
 function isBluetoothFeatureReport(reportLength: number): boolean {

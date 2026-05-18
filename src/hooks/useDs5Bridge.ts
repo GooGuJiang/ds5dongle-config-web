@@ -14,6 +14,7 @@ import {
   NO_DEVICE_SELECTED_ERROR,
   WEBHID_UNAVAILABLE_ERROR,
   getDeviceLabel,
+  getDeviceKey,
   webHidAvailable,
 } from "../protocol/ds5BridgeHid";
 
@@ -143,7 +144,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     const entries = await Promise.all(
       devices.map(async (device) => {
         if (clientRef.current?.device === device) {
-          return [deviceKey(device), { batteryText, serialNumber: deviceSerialNumber, firmwareVersion, signalStrength }] as const;
+          return [getDeviceKey(device), { batteryText, serialNumber: deviceSerialNumber, firmwareVersion, signalStrength }] as const;
         }
 
         const nextClient = new Ds5BridgeHidClient(device);
@@ -157,7 +158,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
           ]);
           await nextClient.close();
           return [
-            deviceKey(device),
+            getDeviceKey(device),
             {
               batteryText: nextBatteryText ?? "--",
               serialNumber: nextSerialNumber || "--",
@@ -166,7 +167,7 @@ export function useDs5Bridge(): UseDs5BridgeResult {
             },
           ] as const;
         } catch {
-          return [deviceKey(device), { batteryText: "--", serialNumber: "--", firmwareVersion: "--", signalStrength: "--" }] as const;
+          return [getDeviceKey(device), { batteryText: "--", serialNumber: "--", firmwareVersion: "--", signalStrength: "--" }] as const;
         }
       }),
     );
@@ -219,7 +220,11 @@ export function useDs5Bridge(): UseDs5BridgeResult {
   const attachClient = useCallback(
     async (nextClient: Ds5BridgeHidClient) => {
       setOperation("connecting");
+      const previousClient = clientRef.current;
       try {
+        if (previousClient && previousClient.device !== nextClient.device) {
+          await previousClient.close().catch(() => undefined);
+        }
         await nextClient.open();
         clientRef.current = nextClient;
         setClient(nextClient);
@@ -624,16 +629,6 @@ export function useDs5Bridge(): UseDs5BridgeResult {
     },
     clearError: () => setError(null),
   };
-}
-
-function deviceKey(device: HIDDevice): string {
-  const serialNumber = device.serialNumber?.trim();
-
-  if (serialNumber) {
-    return `${device.vendorId}:${device.productId}:${serialNumber}`;
-  }
-
-  return `${device.vendorId}:${device.productId}:${device.productName}`;
 }
 
 function listenForBatteryText(device: HIDDevice, timeoutMs: number): Promise<string | null> {

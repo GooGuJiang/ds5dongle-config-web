@@ -47,6 +47,8 @@ export default function App() {
   const [pwaUpdateResult, setPwaUpdateResult] = useState<PwaUpdateCheckResult | null>(null);
   const [pwaUpdateDialogOpen, setPwaUpdateDialogOpen] = useState(false);
   const [pwaUpdating, setPwaUpdating] = useState(false);
+  const [deviceSwitching, setDeviceSwitching] = useState(false);
+  const deviceSwitchingTimerRef = useRef<number | null>(null);
   const dismissedFirmwareUpdateKeyRef = useRef(readDismissedUpdateKey(FIRMWARE_UPDATE_DISMISSED_KEY));
   const dismissedPwaUpdateKeyRef = useRef(readDismissedUpdateKey(PWA_UPDATE_DISMISSED_KEY));
   const isBusy = bridge.operation !== null;
@@ -164,6 +166,40 @@ export default function App() {
     void applyPwaUpdate().finally(() => setPwaUpdating(false));
   }, []);
 
+  const handleSelectDevice = useCallback(async (device: HIDDevice) => {
+    const shouldAnimateSwitch = bridge.client?.device !== device;
+
+    if (!shouldAnimateSwitch) {
+      await bridge.connectAuthorized(device);
+      return;
+    }
+
+    if (deviceSwitchingTimerRef.current !== null) {
+      window.clearTimeout(deviceSwitchingTimerRef.current);
+      deviceSwitchingTimerRef.current = null;
+    }
+
+    setDeviceSwitching(true);
+
+    try {
+      await Promise.all([
+        bridge.connectAuthorized(device),
+        wait(180),
+      ]);
+    } finally {
+      deviceSwitchingTimerRef.current = window.setTimeout(() => {
+        setDeviceSwitching(false);
+        deviceSwitchingTimerRef.current = null;
+      }, 180);
+    }
+  }, [bridge.client, bridge.connectAuthorized]);
+
+  useEffect(() => () => {
+    if (deviceSwitchingTimerRef.current !== null) {
+      window.clearTimeout(deviceSwitchingTimerRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia(SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY);
     const syncSidebarState = () => setSidebarOpen(!mediaQuery.matches);
@@ -192,7 +228,7 @@ export default function App() {
         onOpenChange={handlePwaUpdateDialogOpenChange}
         onUpdate={handlePwaUpdate}
       />
-        <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""}`}>
+        <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""} ${deviceSwitching ? "is-device-switching" : ""}`}>
         <AppHeader
           theme={theme.theme}
           onThemeChange={theme.setTheme}
@@ -230,7 +266,7 @@ export default function App() {
                 isBusy={isBusy}
                 supported={bridge.supported}
                 onConnect={bridge.connect}
-                onConnectAuthorized={bridge.connectAuthorized}
+                onConnectAuthorized={handleSelectDevice}
                 onOpenSettings={() => setView("settings")}
               />
             </div>
@@ -255,7 +291,7 @@ export default function App() {
                   firmwareUpdateAvailable={Boolean(firmwareUpdateResult?.updateAvailable)}
                   firmwareUpdateVersion={firmwareUpdateResult?.latestRelease.tagName}
                   onFirmwareUpdateClick={handleOpenFirmwareUpdateDialog}
-                  onSelectDevice={bridge.connectAuthorized}
+                  onSelectDevice={handleSelectDevice}
                 />
                 <SidebarGroup>
                   <SidebarGroupContent>
@@ -336,4 +372,8 @@ function writeDismissedUpdateKey(storageKey: string, updateKey: string): void {
   } catch {
     // Ignore storage failures; the in-memory ref still prevents repeated prompts in this session.
   }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

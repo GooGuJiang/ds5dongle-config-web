@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Tooltip } from "react-tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getDeviceKey, getDeviceLabel } from "@/protocol/ds5BridgeHid";
 
 interface DeviceStripProps {
   authorizedDevices: HIDDevice[];
@@ -21,7 +22,7 @@ interface DeviceStripProps {
   authorizedDeviceBatteryText: Record<string, string>;
   authorizedDeviceFirmwareVersion: Record<string, string>;
   authorizedDeviceSignalStrength: Record<string, string>;
-  client: unknown | null;
+  client: { device: HIDDevice } | null;
   batteryText: string;
   firmwareVersion: string;
   signalStrength: string;
@@ -53,21 +54,23 @@ export function DeviceStrip({
   onOpenSettings,
 }: DeviceStripProps) {
   const { t } = useTranslation();
+  const connectedDeviceKey = client ? getDeviceKey(client.device) : null;
   const connectedDevice = client
-    ? [{ key: deviceLabel, label: deviceLabel, batteryText, firmwareVersion, signalStrength, serialNumber: deviceSerialNumber, connected: true, device: null }]
+    ? [{ key: connectedDeviceKey ?? deviceLabel, label: deviceLabel, batteryText, firmwareVersion, signalStrength, serialNumber: deviceSerialNumber, connected: true, device: null }]
     : [];
-  const pairedDevices = client
-    ? connectedDevice
-    : authorizedDevices.map((device) => ({
-        key: `${device.vendorId}:${device.productId}:${device.productName}`,
-        label: deviceLabelFromDevice(device),
-        batteryText: authorizedDeviceBatteryText[deviceKey(device)] ?? "--",
-        firmwareVersion: authorizedDeviceFirmwareVersion[deviceKey(device)] ?? "--",
-        signalStrength: authorizedDeviceSignalStrength[deviceKey(device)] ?? "--",
-        serialNumber: authorizedDeviceSerialNumber[deviceKey(device)] ?? "--",
-        connected: false,
-        device,
-      }));
+  const authorizedDeviceCards = authorizedDevices
+    .filter((device) => getDeviceKey(device) !== connectedDeviceKey)
+    .map((device) => ({
+      key: getDeviceKey(device),
+      label: getDeviceLabel(device),
+      batteryText: authorizedDeviceBatteryText[getDeviceKey(device)] ?? "--",
+      firmwareVersion: authorizedDeviceFirmwareVersion[getDeviceKey(device)] ?? "--",
+      signalStrength: authorizedDeviceSignalStrength[getDeviceKey(device)] ?? "--",
+      serialNumber: authorizedDeviceSerialNumber[getDeviceKey(device)] ?? "--",
+      connected: false,
+      device,
+    }));
+  const pairedDevices = [...connectedDevice, ...authorizedDeviceCards];
   const hasPairedDevice = pairedDevices.length > 0;
   const hasMultiplePairedDevices = pairedDevices.length > 1;
 
@@ -138,7 +141,7 @@ export function DeviceStrip({
                       <strong>
                         <span>{deviceName}</span>
                       </strong>
-                      {!item.connected && item.serialNumber === "--" && <p>{t("device.selectToConnect")}</p>}
+                      {!item.connected && <p>{t("device.selectToConnect")}</p>}
                     </div>
                     <div className="device-status-icons">
                       <span
@@ -201,21 +204,6 @@ export function DeviceStrip({
       <Tooltip id="device-info-tooltip" place="top" positionStrategy="fixed" />
     </section>
   );
-}
-
-function deviceLabelFromDevice(device: HIDDevice): string {
-  const productId = device.productId.toString(16).padStart(4, "0").toUpperCase();
-  return `${device.productName || "DS5 Bridge"} · ${device.vendorId.toString(16).padStart(4, "0").toUpperCase()}:${productId}`;
-}
-
-function deviceKey(device: HIDDevice): string {
-  const serialNumber = device.serialNumber?.trim();
-
-  if (serialNumber) {
-    return `${device.vendorId}:${device.productId}:${serialNumber}`;
-  }
-
-  return `${device.vendorId}:${device.productId}:${device.productName}`;
 }
 
 function BatteryIcon({ batteryText }: { batteryText: string }) {

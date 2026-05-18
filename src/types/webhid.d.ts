@@ -30,6 +30,10 @@ interface HIDReportItem {
 }
 
 interface HIDCollectionInfo {
+  readonly usagePage?: number;
+  readonly usage?: number;
+  readonly inputReports?: HIDReportInfo[];
+  readonly outputReports?: HIDReportInfo[];
   readonly featureReports?: HIDReportInfo[];
 }
 
