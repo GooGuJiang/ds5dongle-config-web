@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { Info, Settings } from "lucide-react";
 import packageJson from "../package.json";
 
 export type AppView = "home" | "settings" | "about";
@@ -36,12 +35,3 @@ export const SETTINGS_SIDEBAR_PROVIDER_STYLE = {
 } as CSSProperties;
 
 export const SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1120px)";
-
-export const SETTINGS_NAV_ITEMS = [
-  { icon: Settings, labelKey: "settings.nav.settings", view: "settings" },
-  { icon: Info, labelKey: "settings.nav.about", view: "about" },
-] as const satisfies ReadonlyArray<{
-  icon: typeof Settings;
-  labelKey: string;
-  view: Exclude<AppView, "home">;
-}>;

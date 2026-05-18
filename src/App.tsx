@@ -1,40 +1,24 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Info } from "lucide-react";
-import { FaGithub } from "react-icons/fa";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import {
   APP_METADATA,
   APP_TOAST_OPTIONS,
   SETTINGS_SIDEBAR_AUTO_COLLAPSE_QUERY,
-  SETTINGS_NAV_ITEMS,
-  SETTINGS_SIDEBAR_PROVIDER_STYLE,
   type AppView,
 } from "./appConfig";
 import { AppHeader } from "./components/AppHeader";
-import { ConfigPanel } from "./components/ConfigPanel";
 import { DeviceStrip } from "./components/DeviceStrip";
-import { FirmwareUpdateDialog } from "./components/FirmwareUpdateDialog";
 import { NoticeList } from "./components/NoticeList";
-import { PwaUpdateDialog } from "./components/PwaUpdateDialog";
-import { SidebarDeviceCard } from "./components/SidebarDeviceCard";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "./components/ui/sidebar";
 import { useDs5Bridge } from "./hooks/useDs5Bridge";
 import { useTheme } from "./hooks/useTheme";
 import { checkFirmwareUpdate, shouldCheckFirmwareUpdate, type FirmwareUpdateCheckResult } from "./lib/firmwareRelease";
 import { checkPwaUpdate, type PwaUpdateCheckResult } from "./lib/pwaRelease";
 import { applyPwaUpdate } from "./pwa";
+
+const FirmwareUpdateDialog = lazy(() => import("./components/FirmwareUpdateDialog").then((module) => ({ default: module.FirmwareUpdateDialog })));
+const PwaUpdateDialog = lazy(() => import("./components/PwaUpdateDialog").then((module) => ({ default: module.PwaUpdateDialog })));
+const SettingsView = lazy(() => import("./components/SettingsView").then((module) => ({ default: module.SettingsView })));
 
 export default function App() {
   const bridge = useDs5Bridge();
@@ -52,6 +36,10 @@ export default function App() {
   const dismissedFirmwareUpdateKeyRef = useRef(readDismissedUpdateKey(FIRMWARE_UPDATE_DISMISSED_KEY));
   const dismissedPwaUpdateKeyRef = useRef(readDismissedUpdateKey(PWA_UPDATE_DISMISSED_KEY));
   const isBusy = bridge.operation !== null;
+  const headerIssues = useMemo(() => bridge.issues.map((issue) => t(`validation.${issue.field}`)), [bridge.issues, t]);
+  const isSettingsView = view === "settings" || view === "about";
+  const handleBackHome = useCallback(() => setView("home"), []);
+  const handleOpenSettings = useCallback(() => setView("settings"), []);
   // 进度条完成后切换回主页（仅在模式切换场景下触发）
   const handleProgressComplete = useCallback(() => {
     if (bridge.shouldReturnHomeRef.current) {
@@ -216,31 +204,39 @@ export default function App() {
         position="top-right"
         toastOptions={APP_TOAST_OPTIONS}
       />
-      <FirmwareUpdateDialog
-        open={firmwareUpdateDialogOpen}
-        result={firmwareUpdateResult}
-        onOpenChange={handleFirmwareUpdateDialogOpenChange}
-      />
-      <PwaUpdateDialog
-        open={pwaUpdateDialogOpen}
-        result={pwaUpdateResult}
-        updating={pwaUpdating}
-        onOpenChange={handlePwaUpdateDialogOpenChange}
-        onUpdate={handlePwaUpdate}
-      />
-        <main className={`app-shell ${view === "settings" || view === "about" ? "settings-mode" : ""} ${deviceSwitching ? "is-device-switching" : ""}`}>
+      {firmwareUpdateResult?.updateAvailable && (
+        <Suspense fallback={null}>
+          <FirmwareUpdateDialog
+            open={firmwareUpdateDialogOpen}
+            result={firmwareUpdateResult}
+            onOpenChange={handleFirmwareUpdateDialogOpenChange}
+          />
+        </Suspense>
+      )}
+      {pwaUpdateResult?.updateAvailable && (
+        <Suspense fallback={null}>
+          <PwaUpdateDialog
+            open={pwaUpdateDialogOpen}
+            result={pwaUpdateResult}
+            updating={pwaUpdating}
+            onOpenChange={handlePwaUpdateDialogOpenChange}
+            onUpdate={handlePwaUpdate}
+          />
+        </Suspense>
+      )}
+        <main className={`app-shell ${isSettingsView ? "settings-mode" : ""} ${deviceSwitching ? "is-device-switching" : ""}`}>
         <AppHeader
           theme={theme.theme}
           onThemeChange={theme.setTheme}
           pwaUpdateAvailable={Boolean(pwaUpdateResult?.updateAvailable)}
           pwaUpdateVersion={pwaUpdateResult?.latestRelease.tagName}
           onPwaUpdateClick={handleOpenPwaUpdateDialog}
-          statusText={(view === "settings" || view === "about") && bridge.client ? bridge.statusText : undefined}
-          issues={bridge.issues.map((issue) => t(`validation.${issue.field}`))}
+          statusText={isSettingsView && bridge.client ? bridge.statusText : undefined}
+          issues={headerIssues}
           needsUsbReconnect={bridge.needsUsbReconnect}
-          showBackButton={view === "settings" || view === "about"}
-          onBack={() => setView("home")}
-          showDeviceActions={(view === "settings" || view === "about") && Boolean(bridge.client)}
+          showBackButton={isSettingsView}
+          onBack={handleBackHome}
+          showDeviceActions={isSettingsView && Boolean(bridge.client)}
           canUseDeviceActions={Boolean(bridge.client)}
           canResetToDefaults={!bridge.isDefaultConfig}
           isBusy={isBusy}
@@ -267,7 +263,7 @@ export default function App() {
                 supported={bridge.supported}
                 onConnect={bridge.connect}
                 onConnectAuthorized={handleSelectDevice}
-                onOpenSettings={() => setView("settings")}
+                onOpenSettings={handleOpenSettings}
               />
             </div>
             <span className="app-version-watermark" aria-label={`${t("about.version")} v${APP_METADATA.version}`}>
@@ -275,71 +271,19 @@ export default function App() {
             </span>
           </>
         ) : (
-          <SidebarProvider className="settings-page" style={SETTINGS_SIDEBAR_PROVIDER_STYLE} open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <Sidebar className="settings-sidebar" collapsible="icon" aria-label={t("settings.navigation")}>
-              <SidebarContent className="settings-sidebar-content">
-                <SidebarDeviceCard
-                  authorizedDevices={bridge.authorizedDevices}
-                  authorizedDeviceBatteryText={bridge.authorizedDeviceBatteryText}
-                  authorizedDeviceFirmwareVersion={bridge.authorizedDeviceFirmwareVersion}
-                  authorizedDeviceSignalStrength={bridge.authorizedDeviceSignalStrength}
-                  connectedDevice={bridge.client?.device ?? null}
-                  deviceLabel={bridge.deviceLabel}
-                  batteryText={bridge.batteryText}
-                  firmwareVersion={bridge.firmwareVersion}
-                  signalStrength={bridge.signalStrength}
-                  firmwareUpdateAvailable={Boolean(firmwareUpdateResult?.updateAvailable)}
-                  firmwareUpdateVersion={firmwareUpdateResult?.latestRelease.tagName}
-                  onFirmwareUpdateClick={handleOpenFirmwareUpdateDialog}
-                  onSelectDevice={handleSelectDevice}
-                />
-                <SidebarGroup>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {SETTINGS_NAV_ITEMS.map((item) => {
-                        const label = t(item.labelKey);
-
-                        return (
-                        <SidebarMenuItem key={item.labelKey}>
-                          <SidebarMenuButton type="button" isActive={view === item.view} tooltip={label} onClick={() => setView(item.view)}>
-                            <item.icon />
-                            <span>{label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        );
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </SidebarContent>
-              <SidebarTrigger className="settings-sidebar-trigger" />
-            </Sidebar>
-
-            <SidebarInset className="settings-detail">
-              <div key={view} className="settings-view-transition">
-                {view === "settings" ? (
-                  <ConfigPanel bridge={bridge} onProgressComplete={handleProgressComplete} />
-                ) : (
-                  <section className="panel about-panel" aria-labelledby="about-title">
-                  <div className="panel-title about-panel-title">
-                    <Info size={18} />
-                    <h2 id="about-title">{t("about.title")}</h2>
-                  </div>
-
-                  <div className="about-info-grid">
-                    <a className="config-section about-github-card" href={APP_METADATA.githubUrl} target="_blank" rel="noreferrer">
-                      <FaGithub aria-hidden="true" />
-                      <span>
-                        <span className="about-info-label">{t("about.github")}</span>
-                        <strong>{APP_METADATA.githubUrl}</strong>
-                      </span>
-                    </a>
-                  </div>
-                  </section>
-                )}
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
+          <Suspense fallback={<section className="panel settings-detail" aria-busy="true" />}>
+            <SettingsView
+              bridge={bridge}
+              firmwareUpdateResult={firmwareUpdateResult}
+              sidebarOpen={sidebarOpen}
+              view={view}
+              onFirmwareUpdateClick={handleOpenFirmwareUpdateDialog}
+              onProgressComplete={handleProgressComplete}
+              onSelectDevice={handleSelectDevice}
+              onSidebarOpenChange={setSidebarOpen}
+              onViewChange={setView}
+            />
+          </Suspense>
         )}
 
       </main>

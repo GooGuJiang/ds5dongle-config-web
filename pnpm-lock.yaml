@@ -69,8 +69,8 @@ importers:
         specifier: ^5.6.0
         version: 5.6.0(react@19.2.5)
       react-tooltip:
-        specifier: ^6.0.2
-        version: 6.0.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^6.0.3
+        version: 6.0.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -3568,8 +3568,8 @@ packages:
       '@types/react':
         optional: true
 
-  react-tooltip@6.0.2:
-    resolution: {integrity: sha512-34/RxCkIu+MzIUGZIdRr/BR6heuopU1m1k8EeVEkApFQdloM8nzgYdiigrJ/DniCoMHyx/PcFe0pbG2MtlDwnw==}
+  react-tooltip@6.0.3:
+    resolution: {integrity: sha512-CFYZJOGVUiKV1ddF7p/jhNyY6+mbt6UZEIDBzWVgdAvhGTXGfXDwQT4tPwic7hTTszDKRy5kqTKbG92Sms03cQ==}
     peerDependencies:
       react: '>=16.14.0'
       react-dom: '>=16.14.0'
@@ -7703,7 +7703,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.14
 
-  react-tooltip@6.0.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  react-tooltip@6.0.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       '@floating-ui/dom': 1.7.6
       clsx: 2.1.1

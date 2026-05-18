@@ -53,6 +53,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         cacheId: `ds5dongle-config-web-${appVersion}`,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
+        globIgnores: ["**/bundle-stats.html"],
         navigateFallback: "index.html",
       },
     }),
@@ -60,6 +61,47 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "react-vendor",
+              test: /node_modules[\\/](react|react-dom)[\\/]/,
+              priority: 40,
+            },
+            {
+              name: "radix-vendor",
+              test: /node_modules[\\/](@radix-ui|radix-ui|@floating-ui)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: "ui-vendor",
+              test: /node_modules[\\/](lucide-react|react-icons|motion|react-hot-toast|class-variance-authority|clsx|tailwind-merge)[\\/]/,
+              priority: 25,
+            },
+            {
+              name: "i18n-vendor",
+              test: /node_modules[\\/](i18next|i18next-browser-languagedetector|react-i18next)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "pwa-vendor",
+              test: /node_modules[\\/]workbox-window[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "vendor",
+              test: /node_modules[\\/]/,
+              priority: 10,
+              maxSize: 180 * 1024,
+            },
+          ],
+        },
+      },
     },
   },
 });

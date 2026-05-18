@@ -60,7 +60,7 @@ export function AppHeader({
   const { t } = useTranslation();
   const tooltipPortalRef = useRef<HTMLDivElement | null>(null);
   const [tooltipPortalRoot, setTooltipPortalRoot] = useState<HTMLDivElement | null>(null);
-const showControlBar = Boolean(statusText || showDeviceActions);
+  const showControlBar = Boolean(statusText || showDeviceActions);
   const [displayStatusText, setDisplayStatusText] = useState(statusText);
   const [displayIssues, setDisplayIssues] = useState(issues);
   const [displayNeedsUsbReconnect, setDisplayNeedsUsbReconnect] = useState(needsUsbReconnect);

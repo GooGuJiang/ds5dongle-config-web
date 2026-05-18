@@ -1,0 +1,17 @@
+﻿@font-face {
+  font-family: "OPPO Sans 4.0";
+  src: url("https://cdn.jsdelivr.net/npm/@fontpkg/oppo-sans-4-0@1.700.0/OPPO%20Sans%204.0.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src:
+    url("https://cdn.jsdelivr.net/npm/@ayahub/webfont-harmony-sans-sc@1.0.0/fonts/HarmonyOS_Sans_SC_Medium.woff2") format("woff2"),
+    url("https://cdn.jsdelivr.net/npm/@ayahub/webfont-harmony-sans-sc@1.0.0/fonts/HarmonyOS_Sans_SC_Medium.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

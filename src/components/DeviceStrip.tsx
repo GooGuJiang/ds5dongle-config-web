@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from "react";
+import { memo, useCallback, useMemo, type KeyboardEvent } from "react";
 import { CircleAlert, Plus, Radio } from "lucide-react";
 import {
   MdBattery0Bar,
@@ -35,7 +35,7 @@ interface DeviceStripProps {
   onOpenSettings: () => void;
 }
 
-export function DeviceStrip({
+export const DeviceStrip = memo(function DeviceStrip({
   authorizedDevices,
   authorizedDeviceSerialNumber,
   authorizedDeviceBatteryText,
@@ -54,58 +54,78 @@ export function DeviceStrip({
   onOpenSettings,
 }: DeviceStripProps) {
   const { t } = useTranslation();
-  const connectedDeviceKey = client ? getDeviceKey(client.device) : null;
-  const connectedDevice = client
-    ? [{ key: connectedDeviceKey ?? deviceLabel, label: deviceLabel, batteryText, firmwareVersion, signalStrength, serialNumber: deviceSerialNumber, connected: true, device: null }]
-    : [];
-  const authorizedDeviceCards = authorizedDevices
-    .filter((device) => getDeviceKey(device) !== connectedDeviceKey)
-    .map((device) => ({
-      key: getDeviceKey(device),
-      label: getDeviceLabel(device),
-      batteryText: authorizedDeviceBatteryText[getDeviceKey(device)] ?? "--",
-      firmwareVersion: authorizedDeviceFirmwareVersion[getDeviceKey(device)] ?? "--",
-      signalStrength: authorizedDeviceSignalStrength[getDeviceKey(device)] ?? "--",
-      serialNumber: authorizedDeviceSerialNumber[getDeviceKey(device)] ?? "--",
-      connected: false,
-      device,
-    }));
-  const pairedDevices = [...connectedDevice, ...authorizedDeviceCards];
+  const connectedDeviceKey = useMemo(() => client ? getDeviceKey(client.device) : null, [client]);
+  const pairedDevices = useMemo(() => {
+    const connectedDevice = client
+      ? [{ key: connectedDeviceKey ?? deviceLabel, label: deviceLabel, batteryText, firmwareVersion, signalStrength, serialNumber: deviceSerialNumber, connected: true, device: null }]
+      : [];
+    const authorizedDeviceCards = authorizedDevices
+      .filter((device) => getDeviceKey(device) !== connectedDeviceKey)
+      .map((device) => {
+        const deviceKey = getDeviceKey(device);
+
+        return {
+          key: deviceKey,
+          label: getDeviceLabel(device),
+          batteryText: authorizedDeviceBatteryText[deviceKey] ?? "--",
+          firmwareVersion: authorizedDeviceFirmwareVersion[deviceKey] ?? "--",
+          signalStrength: authorizedDeviceSignalStrength[deviceKey] ?? "--",
+          serialNumber: authorizedDeviceSerialNumber[deviceKey] ?? "--",
+          connected: false,
+          device,
+        };
+      });
+
+    return [...connectedDevice, ...authorizedDeviceCards];
+  }, [
+    authorizedDeviceBatteryText,
+    authorizedDeviceFirmwareVersion,
+    authorizedDeviceSerialNumber,
+    authorizedDeviceSignalStrength,
+    authorizedDevices,
+    batteryText,
+    client,
+    connectedDeviceKey,
+    deviceLabel,
+    deviceSerialNumber,
+    firmwareVersion,
+    signalStrength,
+  ]);
   const hasPairedDevice = pairedDevices.length > 0;
   const hasMultiplePairedDevices = pairedDevices.length > 1;
 
-  const openSettingsFromCard = () => {
+  const openSettingsFromCard = useCallback(() => {
     if (client) {
       onOpenSettings();
     }
-  };
+  }, [client, onOpenSettings]);
 
-  const openSettingsFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+  const openSettingsFromKeyboard = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     if (!client || (event.key !== "Enter" && event.key !== " ")) {
       return;
     }
 
     event.preventDefault();
     onOpenSettings();
-  };
+  }, [client, onOpenSettings]);
 
-  const openAuthorizedDevice = async (device: HIDDevice) => {
+  const openAuthorizedDevice = useCallback(async (device: HIDDevice) => {
     if (!supported || isBusy) {
       return;
     }
 
     await onConnectAuthorized(device);
     onOpenSettings();
-  };
+  }, [isBusy, onConnectAuthorized, onOpenSettings, supported]);
 
-  const openAuthorizedDeviceFromKeyboard = (event: KeyboardEvent<HTMLDivElement>, device: HIDDevice) => {
+  const openAuthorizedDeviceFromKeyboard = useCallback((event: KeyboardEvent<HTMLDivElement>, device: HIDDevice) => {
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
 
     event.preventDefault();
     void openAuthorizedDevice(device);
-  };
+  }, [openAuthorizedDevice]);
 
   return (
     <section className="device-stage" aria-label={t("device.label")}>
@@ -204,7 +224,7 @@ export function DeviceStrip({
       <Tooltip id="device-info-tooltip" place="top" positionStrategy="fixed" />
     </section>
   );
-}
+});
 
 function BatteryIcon({ batteryText }: { batteryText: string }) {
   const level = batteryLevelFromText(batteryText);
