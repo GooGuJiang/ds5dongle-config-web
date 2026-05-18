@@ -94,11 +94,11 @@ export default function App() {
   }, [bridge.client, bridge.firmwareVersion, view]);
 
   useEffect(() => {
-    const abortController = new AbortController();
+    let ignore = false;
 
-    void checkPwaUpdate(abortController.signal)
+    void checkPwaUpdate()
       .then((result) => {
-        if (!result?.updateAvailable || abortController.signal.aborted) {
+        if (!result?.updateAvailable || ignore) {
           return;
         }
 
@@ -111,12 +111,14 @@ export default function App() {
         }
       })
       .catch((error) => {
-        if (!abortController.signal.aborted) {
+        if (!ignore) {
           console.error("PWA update check failed", error);
         }
       });
 
-    return () => abortController.abort();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleFirmwareUpdateDialogOpenChange = useCallback((open: boolean) => {
