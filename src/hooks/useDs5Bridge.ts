@@ -133,11 +133,6 @@ export function useDs5Bridge(): UseDs5BridgeResult {
       return;
     }
 
-    if (requireManualSelectionRef.current) {
-      setAuthorizedDevices([]);
-      return;
-    }
-
     setAuthorizedDevices(await Ds5BridgeHidClient.authorizedDevices());
   }, [supported]);
 
@@ -338,7 +333,6 @@ export function useDs5Bridge(): UseDs5BridgeResult {
             // require the user to select the device again manually.
           }
           clearConnectedDevice();
-          setAuthorizedDevices([]);
           break;
         } else {
           setNeedsUsbReconnect(false);
@@ -633,6 +627,12 @@ export function useDs5Bridge(): UseDs5BridgeResult {
 }
 
 function deviceKey(device: HIDDevice): string {
+  const serialNumber = device.serialNumber?.trim();
+
+  if (serialNumber) {
+    return `${device.vendorId}:${device.productId}:${serialNumber}`;
+  }
+
   return `${device.vendorId}:${device.productId}:${device.productName}`;
 }
 

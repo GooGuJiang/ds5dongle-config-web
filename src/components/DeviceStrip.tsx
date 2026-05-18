@@ -69,6 +69,7 @@ export function DeviceStrip({
         device,
       }));
   const hasPairedDevice = pairedDevices.length > 0;
+  const hasMultiplePairedDevices = pairedDevices.length > 1;
 
   const openSettingsFromCard = () => {
     if (client) {
@@ -105,7 +106,7 @@ export function DeviceStrip({
 
   return (
     <section className="device-stage" aria-label={t("device.label")}>
-      <div className="device-card-grid">
+      <div className={`device-card-grid ${hasMultiplePairedDevices ? "has-multiple-devices" : ""}`}>
         {hasPairedDevice ? (
           pairedDevices.map((item) => {
             const [deviceName] = item.label.split(" · ");
@@ -208,6 +209,12 @@ function deviceLabelFromDevice(device: HIDDevice): string {
 }
 
 function deviceKey(device: HIDDevice): string {
+  const serialNumber = device.serialNumber?.trim();
+
+  if (serialNumber) {
+    return `${device.vendorId}:${device.productId}:${serialNumber}`;
+  }
+
   return `${device.vendorId}:${device.productId}:${device.productName}`;
 }
 

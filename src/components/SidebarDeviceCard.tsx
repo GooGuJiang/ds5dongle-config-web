@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   autoUpdate,
   flip,
@@ -11,7 +11,7 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Battery, BatteryFull, ChevronRight, CircleAlert, Radio, RefreshCw } from "lucide-react";
+import { BatteryFull, ChevronRight, CircleAlert, CircleArrowUp, LoaderCircle, Radio } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -49,7 +49,11 @@ export function SidebarDeviceCard({
 }: SidebarDeviceCardProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPopoverMounted, setIsPopoverMounted] = useState(false);
+  const popoverCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [deviceName] = deviceLabel.split(" · ");
+  const isSignalLoading = isLoadingValue(signalStrength);
+  const isFirmwareLoading = isLoadingValue(firmwareVersion);
   const connectedDeviceKey = connectedDevice ? deviceKey(connectedDevice) : null;
   const visibleDevices = connectedDevice && !authorizedDevices.some((device) => deviceKey(device) === connectedDeviceKey)
     ? [connectedDevice, ...authorizedDevices]
@@ -80,6 +84,30 @@ export function SidebarDeviceCard({
   const role = useRole(context, { role: "dialog" });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
 
+  useEffect(() => {
+    if (popoverCloseTimerRef.current) {
+      window.clearTimeout(popoverCloseTimerRef.current);
+      popoverCloseTimerRef.current = null;
+    }
+
+    if (isOpen) {
+      setIsPopoverMounted(true);
+      return;
+    }
+
+    popoverCloseTimerRef.current = window.setTimeout(() => {
+      setIsPopoverMounted(false);
+      popoverCloseTimerRef.current = null;
+    }, 160);
+
+    return () => {
+      if (popoverCloseTimerRef.current) {
+        window.clearTimeout(popoverCloseTimerRef.current);
+        popoverCloseTimerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
   return (
     <>
       <button ref={refs.setReference} type="button" className="settings-device-card-trigger" {...getReferenceProps()}>
@@ -87,49 +115,65 @@ export function SidebarDeviceCard({
           <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" draggable={false} />
         </span>
         <span className="settings-device-card-copy">
-          <strong>{deviceName}</strong>
-          {firmwareUpdateAvailable && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="settings-device-card-update"
-                    aria-label={t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setIsOpen(false);
-                      onFirmwareUpdateClick?.();
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") {
-                        return;
-                      }
+          <span className="settings-device-card-title-row">
+            <strong>{deviceName}</strong>
+          </span>
+          <span className="settings-device-card-meta">
+            <span>
+              <BatteryFull size={15} aria-hidden="true" />
+              <em>{t("device.battery", { battery: batteryText })}</em>
+            </span>
+            <span>
+              {isSignalLoading ? <LoaderCircle className="settings-device-card-loading-icon" size={15} aria-hidden="true" /> : <Radio size={15} aria-hidden="true" />}
+              <em>{t("device.signalStrength", { signal: signalStrength })}</em>
+            </span>
+            <span>
+              {isFirmwareLoading ? <LoaderCircle className="settings-device-card-loading-icon" size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}
+              <em>{t("device.firmwareVersion", { version: firmwareVersion })}</em>
+              {firmwareUpdateAvailable && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="settings-device-card-update"
+                        aria-label={t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setIsOpen(false);
+                          onFirmwareUpdateClick?.();
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") {
+                            return;
+                          }
 
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setIsOpen(false);
-                      onFirmwareUpdateClick?.();
-                    }}
-                  >
-                    <RefreshCw size={14} aria-hidden="true" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8}>
-                  {t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setIsOpen(false);
+                          onFirmwareUpdateClick?.();
+                        }}
+                      >
+                        <CircleArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={8}>
+                      {t("device.firmwareUpdateAvailable", { version: firmwareUpdateVersion })}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </span>
+          </span>
         </span>
         <ChevronRight size={16} aria-hidden="true" />
       </button>
 
       <FloatingPortal>
-        {isOpen && (
-          <Card ref={refs.setFloating} className="settings-device-popover" style={floatingStyles} {...getFloatingProps()}>
+        {isPopoverMounted && (
+          <Card ref={refs.setFloating} className="settings-device-popover" data-state={isOpen ? "open" : "closed"} style={floatingStyles} {...getFloatingProps()}>
             <CardContent className="settings-device-popover-content">
               <div className="settings-device-popover-head">
                 <strong>{t("device.selectDevice")}</strong>
@@ -154,11 +198,11 @@ export function SidebarDeviceCard({
                     <span className="settings-device-popover-info">
                       <strong>{item.label}</strong>
                       <span className="settings-device-popover-row">
-                        <CircleAlert size={15} aria-hidden="true" />
+                        {isLoadingValue(item.firmwareVersion) ? <LoaderCircle className="settings-device-card-loading-icon" size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}
                         <span>{t("device.firmwareVersion", { version: item.firmwareVersion })}</span>
                       </span>
                       <span className="settings-device-popover-row">
-                        <Radio size={15} aria-hidden="true" />
+                        {isLoadingValue(item.signalStrength) ? <LoaderCircle className="settings-device-card-loading-icon" size={15} aria-hidden="true" /> : <Radio size={15} aria-hidden="true" />}
                         <span>{t("device.signalStrength", { signal: item.signalStrength })}</span>
                       </span>
                       <span className="settings-device-popover-row">
@@ -178,10 +222,20 @@ export function SidebarDeviceCard({
 }
 
 function deviceKey(device: HIDDevice): string {
+  const serialNumber = device.serialNumber?.trim();
+
+  if (serialNumber) {
+    return `${device.vendorId}:${device.productId}:${serialNumber}`;
+  }
+
   return `${device.vendorId}:${device.productId}:${device.productName}`;
 }
 
 function deviceLabelFromDevice(device: HIDDevice): string {
   const productId = device.productId.toString(16).padStart(4, "0").toUpperCase();
   return `${device.productName || "DS5 Bridge"} · ${device.vendorId.toString(16).padStart(4, "0").toUpperCase()}:${productId}`;
+}
+
+function isLoadingValue(value: string): boolean {
+  return value.trim() === "--";
 }
