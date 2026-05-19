@@ -7,7 +7,9 @@ import {
 } from "./config";
 
 export const SONY_VENDOR_ID = 0x054c;
-export const SUPPORTED_PRODUCT_IDS = [0x0ce6, 0x0df2] as const;
+export const DUALSENSE_PRODUCT_ID = 0x0ce6;
+export const DUALSENSE_EDGE_PRODUCT_ID = 0x0df2;
+export const SUPPORTED_PRODUCT_IDS = [DUALSENSE_PRODUCT_ID, DUALSENSE_EDGE_PRODUCT_ID] as const;
 export const NO_DEVICE_SELECTED_ERROR = "noDeviceSelected";
 export const WEBHID_UNAVAILABLE_ERROR = "webHidUnavailable";
 
@@ -174,6 +176,10 @@ export function getDeviceKey(device: HIDDevice): string {
 
   deviceSessionKeyByDevice.set(device, key);
   return key;
+}
+
+export function getControllerIconSrc(device: HIDDevice | null): string {
+  return device?.productId === DUALSENSE_EDGE_PRODUCT_ID ? "/images/ps5-controller-edge.webp" : "/svg/ps5-controller-gamepad-seeklogo.svg";
 }
 
 function getHid(): HID {

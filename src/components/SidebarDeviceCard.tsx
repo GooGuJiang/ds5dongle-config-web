@@ -15,7 +15,7 @@ import { BatteryFull, ChevronRight, CircleAlert, CircleArrowUp, LoaderCircle, Ra
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDeviceKey, getDeviceLabel } from "@/protocol/ds5BridgeHid";
+import { getControllerIconSrc, getDeviceKey, getDeviceLabel } from "@/protocol/ds5BridgeHid";
 
 interface SidebarDeviceCardProps {
   authorizedDevices: HIDDevice[];
@@ -56,6 +56,7 @@ export function SidebarDeviceCard({
   const isSignalLoading = isLoadingValue(signalStrength);
   const isFirmwareLoading = isLoadingValue(firmwareVersion);
   const connectedDeviceKey = connectedDevice ? getDeviceKey(connectedDevice) : null;
+  const connectedDeviceIconSrc = getControllerIconSrc(connectedDevice);
   const visibleDevices = connectedDevice && !authorizedDevices.some((device) => getDeviceKey(device) === connectedDeviceKey)
     ? [connectedDevice, ...authorizedDevices]
     : authorizedDevices;
@@ -70,6 +71,7 @@ export function SidebarDeviceCard({
       batteryText: active ? batteryText : authorizedDeviceBatteryText[key] ?? "--",
       firmwareVersion: active ? firmwareVersion : authorizedDeviceFirmwareVersion[key] ?? "--",
       signalStrength: active ? signalStrength : authorizedDeviceSignalStrength[key] ?? "--",
+      iconSrc: getControllerIconSrc(device),
       active,
       device: active ? null : device,
     };
@@ -114,7 +116,7 @@ export function SidebarDeviceCard({
     <>
       <button ref={refs.setReference} type="button" className="settings-device-card-trigger" {...getReferenceProps()}>
         <span className="settings-device-card-icon" aria-hidden="true">
-          <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" draggable={false} />
+          <img src={connectedDeviceIconSrc} alt="" draggable={false} />
         </span>
         <span className="settings-device-card-copy">
           <span className="settings-device-card-title-row">
@@ -193,9 +195,9 @@ export function SidebarDeviceCard({
                       }
                       setIsOpen(false);
                     }}
-                  >
+                    >
                     <span className="settings-device-popover-preview" aria-hidden="true">
-                      <img src="/svg/ps5-controller-gamepad-seeklogo.svg" alt="" draggable={false} />
+                      <img src={item.iconSrc} alt="" draggable={false} />
                     </span>
                     <span className="settings-device-popover-info">
                       <strong>{item.label}</strong>
